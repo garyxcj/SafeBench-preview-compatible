@@ -1,6 +1,6 @@
 ''' 
 Date: 2023-01-31 22:23:17
-LastEditTime: 2023-03-09 17:07:24
+LastEditTime: 2023-03-10 11:52:25
 Description: 
     Copyright (c) 2022-2023 Safebench Team
 
@@ -25,10 +25,11 @@ from safebench.agent.base_policy import BasePolicy
 class PolicyNetwork(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(PolicyNetwork, self).__init__()
-        self.fc1 = nn.Linear(state_dim, 128)
-        self.fc2 = nn.Linear(128, 128)
-        self.fc_mu = nn.Linear(128, action_dim)
-        self.fc_std = nn.Linear(128, action_dim)
+        hidden_dim = 64
+        self.fc1 = nn.Linear(state_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc_mu = nn.Linear(hidden_dim, action_dim)
+        self.fc_std = nn.Linear(hidden_dim, action_dim)
 
         self.relu = nn.ReLU()
         self.tanh = nn.Tanh()
@@ -63,10 +64,11 @@ class PolicyNetwork(nn.Module):
 class ValueNetwork(nn.Module):
     def __init__(self, state_dim):
         super(ValueNetwork, self).__init__()
+        hidden_dim = 64
         self.relu = nn.ReLU()
-        self.fc1 = nn.Linear(state_dim, 128)
-        self.fc2 = nn.Linear(128, 128)
-        self.fc3 = nn.Linear(128, 1)
+        self.fc1 = nn.Linear(state_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc3 = nn.Linear(hidden_dim, 1)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -132,7 +134,7 @@ class PPO(BasePolicy):
 
     def train(self, replay_buffer):
         self.old_policy.load_state_dict(self.policy.state_dict())
-        
+
         # start to train, use gradient descent without batch size
         for K in range(self.train_iteration):
             batch = replay_buffer.sample(self.batch_size)
@@ -140,15 +142,15 @@ class PPO(BasePolicy):
             bn_a = CUDA(torch.FloatTensor(batch['action']))
             bn_r = CUDA(torch.FloatTensor(batch['reward'])).unsqueeze(-1) # [B, 1]
             bn_s_ = CUDA(torch.FloatTensor(batch['n_state']))
-            bn_d = CUDA(torch.FloatTensor(1-batch['done'])).unsqueeze(-1) # [B, 1]
+            #bn_d = CUDA(torch.FloatTensor(1-batch['done'])).unsqueeze(-1) # [B, 1]
 
             with torch.no_grad():
-                value_target = bn_r + self.gamma * self.value(bn_s_)
-                advantage = value_target - self.value(bn_s)
-                # advantage = bn_r - self.value(bn_s)
                 old_mu, old_std = self.old_policy(bn_s)
                 old_n = Normal(old_mu, old_std)
+                value_target = bn_r + self.gamma * self.value(bn_s_)
+                advantage = value_target - self.value(bn_s)
 
+            # update policy
             mu, std = self.policy(bn_s)
             n = Normal(mu, std)
             log_prob = n.log_prob(bn_a)
@@ -158,16 +160,16 @@ class PPO(BasePolicy):
             L2 = torch.clamp(ratio, 1.0-self.clip_epsilon, 1.0+self.clip_epsilon) * advantage
             loss = torch.min(L1, L2)
             loss = -loss.mean()
-            
-            # update parameters
             self.optim.zero_grad()
             loss.backward()
             self.optim.step()
-            value_loss = F.mse_loss(bn_r, self.value(bn_s))
+
+            # update value function
+            value_loss = F.mse_loss(value_target, self.value(bn_s))
             self.value_optim.zero_grad()
             value_loss.backward()
             self.value_optim.step()
-        
+
         # reset buffer
         replay_buffer.reset_buffer()
 
