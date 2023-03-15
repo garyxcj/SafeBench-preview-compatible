@@ -4,6 +4,7 @@ from safebench.scenario.scenario_manager.carla_data_provider import CarlaDataPro
 from safebench.gym_carla.envs.route_planner import RoutePlanner
 from safebench.scenario.tools.scenario_utils import convert_transform_to_location
 from safebench.scenario.scenario_definition.scenic.dynamic_scenic import DynamicScenic as scenario_scenic
+from safebench.scenario.tools.route_manipulation import interpolate_trajectory
 
 SECONDS_GIVEN_PER_METERS = 1
 from safebench.scenario.scenario_definition.atomic_criteria import (
@@ -45,25 +46,36 @@ class ScenicScenario():
         CarlaDataProvider._carla_actor_pool[actor.id] = actor
         CarlaDataProvider.register_actor(actor)       
         
+        ## coarse traj ##
         init_waypoints = []
-        routeplanner = RoutePlanner(ego_vehicle, 12, init_waypoints)
+        routeplanner = RoutePlanner(ego_vehicle, 200, init_waypoints, ego_route=self.config.ego_route)
         
         _waypoint_buffer = []
-        
-        # skip the initial point
-        pop = routeplanner._waypoints_queue.popleft()
-        
-        ### 150m route planning ###
-        while len(_waypoint_buffer) < 30:
+        while len(_waypoint_buffer) < 100:
             pop = routeplanner._waypoints_queue.popleft()
-            _waypoint_buffer.append((pop[0].transform, pop[1]))
+            _waypoint_buffer.append(pop[0].transform.location)
+            
+        ### 150 meter dense route planning ###
+        route = interpolate_trajectory(self.world, _waypoint_buffer)
+        index = 1
+        prev_wp = route[0][0].location
+        _accum_meters = 0
         
-        CarlaDataProvider.set_ego_vehicle_route(convert_transform_to_location(_waypoint_buffer))
+        while _accum_meters < 150:
+            pop = route[index]
+            wp = pop[0].location
+            d = wp.distance(prev_wp)
+            _accum_meters += d
+            prev_wp = wp
+            index += 1
+        route = route[:index]
+        
+        CarlaDataProvider.set_ego_vehicle_route(convert_transform_to_location(route))
         CarlaDataProvider.set_scenario_config(self.config)
-
+        
         # Timeout of scenario in seconds
-        self.timeout = self._estimate_route_timeout(_waypoint_buffer) if timeout is None else timeout
-        return _waypoint_buffer, ego_vehicle
+        self.timeout = self._estimate_route_timeout(route) if timeout is None else timeout
+        return route, ego_vehicle
 
     def _estimate_route_timeout(self, route):
         route_length = 0.0  # in meters

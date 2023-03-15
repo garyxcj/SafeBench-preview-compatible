@@ -8,8 +8,7 @@ Description:
     For a copy, see <https://opensource.org/licenses/MIT>
 '''
 
-import numpy as np
-import random
+from safebench.util.torch_util import set_seed
 
 class ScenarioDataLoader:
     def __init__(self, config_lists, num_scenario):
@@ -65,13 +64,20 @@ class ScenicDataLoader:
         self.generate_scene(scenic)
         
     def generate_scene(self, scenic):
-        random.seed(self.seed)
+        set_seed(self.seed)
         self.scene = []
         while len(self.scene) < self.config.sample_num:
             scene, _ = scenic.generateScene()
             if scenic.setSimulation(scene):
-                self.scene.append(scene)
-            self.scenic.endSimulation()
+                scenic.update_behavior = scenic.runSimulation()
+                next(scenic.update_behavior)
+                try:
+                    ### skip the scene that the adv agent can not update
+                    next(scenic.update_behavior)
+                    self.scene.append(scene)
+                except:
+                    pass
+                scenic.endSimulation()
             
     def reset_idx_counter(self):
         self.scenario_idx = self.scene_index

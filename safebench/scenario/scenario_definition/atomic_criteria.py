@@ -633,7 +633,7 @@ class RouteCompletionTest(Criterion):
 
     DISTANCE_THRESHOLD = 10.0  # meters
     WINDOWS_SIZE = 2
-
+    
     def __init__(self, actor, route, name="RouteCompletionTest", terminate_on_failure=False):
         super(RouteCompletionTest, self).__init__(name, actor, 100, terminate_on_failure=terminate_on_failure)
         self._actor = actor
@@ -675,7 +675,7 @@ class RouteCompletionTest(Criterion):
         if self._terminate_on_failure and (self.test_status == "FAILURE"):
             new_status = Status.FAILURE
         elif self.test_status == "RUNNING" or self.test_status == "INIT":
-            for index in range(self._current_index, self._route_length):
+            for index in range(self._current_index, min(self._current_index + self._wsize + 1, self._route_length)):
                 # Get the dot product to know if it has passed this location
                 ref_waypoint = self._waypoints[index]
                 wp = self._map.get_waypoint(ref_waypoint)

@@ -4,11 +4,14 @@
 ### modified from https://github.com/BerkeleyLearnVerify/Scenic/blob/main/src/scenic/__main__.py
 ### & https://github.com/BerkeleyLearnVerify/Scenic/blob/main/src/scenic/core/simulators.py
 
+import os 
+import random
+import numpy as np 
+import torch
 import enum
 import sys
 import time
 import argparse
-import random
 import pygame
 from collections import OrderedDict, defaultdict
 
@@ -305,6 +308,9 @@ class ScenicSimulator:
         for scenario in tuple(veneer.runningScenarios):
             scenario._stop('exception', quiet=True)
         veneer.endSimulation(self.simulation)
+        
+    def destroy(self):
+        self.simulator.destroy()
         
 class Action:
     """An :term:`action` which can be taken by an agent for one step of a simulation."""
