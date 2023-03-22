@@ -63,7 +63,7 @@ class CarlaRunner:
             'scenario_category': self.scenario_category,
             'ROOT_DIR': scenario_config['ROOT_DIR'],
             'disable_lidar': True,                                     # show bird-eye view lidar or not
-            'display_size': 128,                                       # screen size of one bird-eye view windowd=
+            'display_size': 128,                                       # screen size of one bird-eye view window
             'obs_range': 32,                                           # observation range (meter)
             'd_behind': 12,                                            # distance behind the ego vehicle (meter)
             'max_past_step': 1,                                        # the number of past steps to draw
@@ -115,7 +115,7 @@ class CarlaRunner:
 
         if self.scenario_config['auto_ego']:
             self.logger.log('>> Using auto-polit for ego vehicle, the action of agent policy will be ignored', 'yellow')
-        if self.scenario_policy_type == 'odrinary' and self.mode != 'train_agent':
+        if self.scenario_policy_type == 'ordinary' and self.mode != 'train_agent':
             self.logger.log('>> Ordinary scenario can only be used in agent training', 'red')
             raise Exception()
         self.logger.log('>> ' + '-' * 40)
@@ -233,7 +233,8 @@ class CarlaRunner:
 
             # reset envs with new config, get init action from scenario policy, and run scenario
             static_obs = self.env.get_static_obs(sampled_scenario_configs)
-            scenario_init_action, _ = self.scenario_policy.get_init_action(static_obs)
+            self.scenario_policy.load_model(sampled_scenario_configs)
+            scenario_init_action, _ = self.scenario_policy.get_init_action(static_obs, deterministic=True)
             obs, infos = self.env.reset(sampled_scenario_configs, scenario_init_action)
 
             # get ego vehicle from scenario
@@ -295,7 +296,7 @@ class CarlaRunner:
             # run with different modes
             if self.mode == 'eval':
                 self.agent_policy.load_model()
-                self.scenario_policy.load_model()
+                # self.scenario_policy.load_model()
                 self.agent_policy.set_mode('eval')
                 self.scenario_policy.set_mode('eval')
                 self.eval(data_loader)
