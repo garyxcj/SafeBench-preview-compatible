@@ -1,6 +1,6 @@
 ''' 
 Date: 2023-01-31 22:23:17
-LastEditTime: 2023-03-08 14:34:13
+LastEditTime: 2023-03-22 17:57:25
 Description: 
     Copyright (c) 2022-2023 Safebench Team
 
@@ -73,15 +73,15 @@ from safebench.scenario.scenario_definition.carla_challenge.junction_crossing_ro
 from safebench.scenario.scenario_definition.carla_challenge.junction_crossing_route import SignalizedJunctionRightTurn as scenario_09_carla_challenge
 from safebench.scenario.scenario_definition.carla_challenge.junction_crossing_route import NoSignalJunctionCrossingRoute as scenario_10_carla_challenge
 
-# LC
-from safebench.scenario.scenario_definition.LC.object_crash_vehicle import DynamicObjectCrossing as scenario_03_lc
-from safebench.scenario.scenario_definition.LC.object_crash_intersection import VehicleTurningRoute as scenario_04_lc
-from safebench.scenario.scenario_definition.LC.other_leading_vehicle import OtherLeadingVehicle as scenario_05_lc
-from safebench.scenario.scenario_definition.LC.maneuver_opposite_direction import ManeuverOppositeDirection as scenario_06_lc
-from safebench.scenario.scenario_definition.LC.junction_crossing_route import OppositeVehicleRunningRedLight as scenario_07_lc
-from safebench.scenario.scenario_definition.LC.junction_crossing_route import SignalizedJunctionLeftTurn as scenario_08_lc
-from safebench.scenario.scenario_definition.LC.junction_crossing_route import SignalizedJunctionRightTurn as scenario_09_lc
-from safebench.scenario.scenario_definition.LC.junction_crossing_route import NoSignalJunctionCrossingRoute as scenario_10_lc
+# lc
+from safebench.scenario.scenario_definition.lc.object_crash_vehicle import DynamicObjectCrossing as scenario_03_lc
+from safebench.scenario.scenario_definition.lc.object_crash_intersection import VehicleTurningRoute as scenario_04_lc
+from safebench.scenario.scenario_definition.lc.other_leading_vehicle import OtherLeadingVehicle as scenario_05_lc
+from safebench.scenario.scenario_definition.lc.maneuver_opposite_direction import ManeuverOppositeDirection as scenario_06_lc
+from safebench.scenario.scenario_definition.lc.junction_crossing_route import OppositeVehicleRunningRedLight as scenario_07_lc
+from safebench.scenario.scenario_definition.lc.junction_crossing_route import SignalizedJunctionLeftTurn as scenario_08_lc
+from safebench.scenario.scenario_definition.lc.junction_crossing_route import SignalizedJunctionRightTurn as scenario_09_lc
+from safebench.scenario.scenario_definition.lc.junction_crossing_route import NoSignalJunctionCrossingRoute as scenario_10_lc
 
 # AdvTraj
 from safebench.scenario.scenario_definition.adv_trajectory.object_crash_vehicle import DynamicObjectCrossing as scenario_03_advtraj
@@ -149,7 +149,7 @@ SCENARIO_CLASS_MAPPING = {
         "Scenario9": scenario_09_carla_challenge,
         "Scenario10": scenario_10_carla_challenge,
     },
-    'LC': {
+    'lc': {
         "Scenario3": scenario_03_lc,
         "Scenario4": scenario_04_lc,
         "Scenario5": scenario_05_lc,
@@ -270,12 +270,18 @@ class RouteScenario():
         return int(SECONDS_GIVEN_PER_METERS * route_length)
 
     def _spawn_ego_vehicle(self, elevate_transform, autopilot=False):
-        try:
-            role_name = 'ego_vehicle' + str(self.ego_id)
-            ego_vehicle = CarlaDataProvider.request_new_actor('vehicle.tesla.model3', elevate_transform, rolename=role_name, autopilot=autopilot)
-            ego_vehicle.set_autopilot(autopilot, CarlaDataProvider.get_traffic_manager_port())
-        except Exception as e:
-            raise RuntimeError("Error while spawning ego vehicle: {}".format(e))
+        role_name = 'ego_vehicle' + str(self.ego_id)
+
+        success = False
+        ego_vehicle = None
+        while not success:
+            try:
+                ego_vehicle = CarlaDataProvider.request_new_actor('vehicle.tesla.model3', elevate_transform,
+                                                                  rolename=role_name, autopilot=autopilot)
+                ego_vehicle.set_autopilot(autopilot, CarlaDataProvider.get_traffic_manager_port())
+                success = True
+            except RuntimeError:
+                elevate_transform.location.z += 0.1
         return ego_vehicle
 
     def _build_scenario_instances(self, scenario_definitions):
@@ -298,7 +304,6 @@ class RouteScenario():
             route_config = RouteScenarioConfig()
             route_config.other_actors = list_of_actor_conf_instances
             route_config.trigger_points = [egoactor_trigger_position]
-            #route_config.subtype = definition['scenario_type']
             route_config.parameters = self.config.parameters
             route_config.num_scenario = self.config.num_scenario
             if self.config.weather is not None:
