@@ -1,12 +1,12 @@
 <!--
  * @Date: 2023-01-25 19:36:50
- * @LastEditTime: 2023-03-17 13:41:40
+ * @LastEditTime: 2023-04-10 11:55:06
  * @Description: 
 -->
 
 # SafeBench
 
-### :mega: **We are hosting the Secure and Safe Autonomous Driving (SSAD) Workshop and Challenge at CVPR 2023! Please check our [website](https://trust-ai.github.io/SSAD2023/) for more details.**
+### :mega: **We are hosting the Secure and Safe Autonomous Driving (SSAD) Workshop and Challenge at CVPR 2023! Please fill this [form](https://forms.gle/LuwDXmFoQEyK2VoK7) to if you are intereted and check our [website](https://trust-ai.github.io/SSAD2023/) for more details. If you have any questions, please join our [discord channel](https://discord.gg/ewDxfbx3) for further discussion!**
 
 ---
 
@@ -14,8 +14,6 @@
 <strong>
 [
 <a href="https://safebench.readthedocs.io">Documentation</a>
-|
-<a href="https://drive.google.com/file/d/1x09q0DYkVBtSAaJPDi3GpQo1bITSXrv2/view?usp=sharing">Demo Video</a>
 |
 <a href="https://safebench.github.io">Website</a>
 |
@@ -30,33 +28,36 @@ This is the source code of Safebench platform, which is designed based on Carla 
 
 ## Installation
 
-### Local Installation
+**Recommended system: Ubuntu 20.04 or 22.04**
 
-1. Recommended system: Ubuntu 20.04 or 22.04
+### 1. Local Installation
 
-2. Setup conda environment
+<details>
+    <summary> Click to expand </summary>
+
+Step 1: Setup conda environment
 ```bash
 conda create -n safebench python=3.8
 conda activate safebench
 ```
 
-3. Clone this git repo in an appropriate folder
+Step 2: Clone this git repo in an appropriate folder
 ```bash
 git clone git@github.com:trust-ai/SafeBench.git
 ```
 
-4. Enter the repo root folder and install the packages:
+Step 3: Enter the repo root folder and install the packages:
 ```bash
 cd SafeBench
 pip install -r requirements.txt
 pip install -e .
 ```
 
-5. Download our [CARLA_0.9.13](https://drive.google.com/file/d/139vLRgXP90Zk6Q_du9cRdOLx7GJIw_0v/view?usp=sharing) and extract it to your folder.
+Step 4: Download our [CARLA_0.9.13](https://drive.google.com/file/d/139vLRgXP90Zk6Q_du9cRdOLx7GJIw_0v/view?usp=sharing) and extract it to your folder.
 
-6. Run `sudo apt install libomp5` as per this [git issue](https://github.com/carla-simulator/carla/issues/4498).
+Step 5: Run `sudo apt install libomp5` as per this [git issue](https://github.com/carla-simulator/carla/issues/4498).
 
-7. Add the python API of CARLA to the ```PYTHONPATH``` environment variable. You can add the following commands to your `~/.bashrc`:
+Step 6: Add the python API of CARLA to the ```PYTHONPATH``` environment variable. You can add the following commands to your `~/.bashrc`:
 ```bash
 export CARLA_ROOT={path/to/your/carla}
 export PYTHONPATH=$PYTHONPATH:${CARLA_ROOT}/PythonAPI/carla/dist/carla-0.9.13-py3.8-linux-x86_64.egg
@@ -64,8 +65,12 @@ export PYTHONPATH=$PYTHONPATH:${CARLA_ROOT}/PythonAPI/carla/agents
 export PYTHONPATH=$PYTHONPATH:${CARLA_ROOT}/PythonAPI/carla
 export PYTHONPATH=$PYTHONPATH:${CARLA_ROOT}/PythonAPI
 ```
+</details>
 
-### Docker Installation
+### 2. Docker Installation
+
+<details>
+    <summary> Click to expand </summary>
 
 We also provide a docker image with CARLA and SafeBench installed. Use the following command to launch a docker container:
 
@@ -75,9 +80,14 @@ bash docker/run_docker.sh
 
 The CARLA simulator is installed at `/home/safebench/carla` and SafeBench is installed at `/home/safebench/SafeBench`.
 
+</details>
+
 ## Usage
 
 ### 1. Desktop Users
+
+<details>
+    <summary> Click to expand </summary>
 
 Enter the CARLA root folder, launch the CARLA server and run our platform with
 ```bash
@@ -87,8 +97,13 @@ Enter the CARLA root folder, launch the CARLA server and run our platform with
 # Launch SafeBench in another terminal
 python scripts/run.py --agent_cfg basic.yaml --scenario_cfg standard.yaml --mode eval
 ```
+</details>
 
 ### 2. Remote Server Users
+
+<details>
+    <summary> Click to expand </summary>
+
 Enter the CARLA root folder, launch the CARLA server with headless mode, and run our platform with
 ```bash
 # Launch CARLA
@@ -123,7 +138,12 @@ ssh -L fp:localhost:5900+n user@host
 ```
 where `user@host` is your remote server, `fp` is a free TCP port on the local machine, and `n` is the display port specified when you started the VNC server on the remote server ("8" in our example).
 
+</details>
+
 ### 3. Visualization with CarlaViz
+
+<details>
+    <summary> Click to expand </summary>
 
 ![carlaviz](./docs/source/images/carlaviz.png)
 CarlaViz is a convenient visualization tool for CARLA developed by a former member [mjxu96](https://github.com/mjxu96) of our team. To use CarlaViz, please open another terminal and follow the intructions:
@@ -136,9 +156,12 @@ cd Safebench/scripts
 sh start_carlaviz.sh
 ```
 Then, you can open the CarlaViz window at http://localhost:8080. You can also remotely access the CarlaViz window by forwarding the port 8080 to your local machine.
-
+</details>
 
 ### 4. Scenic users
+
+<details>
+    <summary> Click to expand </summary>
 
 If you want to use scenic to control the surrounding adversarial agents, and use RL to control the ego, then first install scenic as follows:
 
@@ -165,20 +188,23 @@ Now you can test the ego with these selected adversarial scenes:
 python scripts/run.py --agent_cfg sac.yaml --scenario_cfg scenic.yaml --num_scenario 1 --mode eval
 ```
 
-Or if you want to Launch it on the virtual display
+Or if you want to Launch it on the virtual display:
 
 ```bash
+DISPLAY=:8 python scripts/run.py --agent_cfg sac.yaml --scenario_cfg scenic.yaml --num_scenario 1 --mode train_scenario
 DISPLAY=:8 python scripts/run.py --agent_cfg sac.yaml --scenario_cfg scenic.yaml --num_scenario 1 --mode eval
 ``` 
+</details>
 
-## Running Argument
+## Running Arguments
 
 | Argument | Choice | Usage |
 | :----: | :----: | :---- |
-| `mode` | `[train_agent\train_scenario\eval]` | We provide three modes for training agent, training scenario, and evaluation. |
-| `agent_cfg`      | path of .yaml  |  configuration file of agent. |
-| `scenario_cfg`   | path of .yaml  |  configuration file of scenario. |
+| `mode` | `{train_agent, train_scenario, eval}` | We provide three modes for training agent, training scenario, and evaluation. |
+| `agent_cfg`      | str  |  path to the configuration file of agent. |
+| `scenario_cfg`   | str  |  path to the configuration file of scenario. |
 | `max_episode_step`      | int     | Number of episode used for training agents and scenario. |
 | `num_scenarios` | `{1, 2, 3, 4}` | We support running multiple scenarios in parallel. Current map allows at most 4 scenarios. |
 | `save_video`    | store_true     |  We support saving videos during the evaluation mode. | 
 | `auto_ego`      | store_true     |  Overwrite the action of ego agent with auto-polit |
+| `port`      | int     |  Port used by Carla, default 2000 |

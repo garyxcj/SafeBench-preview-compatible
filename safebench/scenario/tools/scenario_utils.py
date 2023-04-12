@@ -1,6 +1,6 @@
 ''' 
 Date: 2023-01-31 22:23:17
-LastEditTime: 2023-03-22 17:58:18
+LastEditTime: 2023-04-03 19:26:20
 Description: 
     Copyright (c) 2022-2023 Safebench Team
 
@@ -50,9 +50,6 @@ def scenario_parse(config, logger):
     with open(list_of_scenario_config, 'r') as f:
         data_full = json.loads(f.read())
         # filter the list if any parameter is specified
-        if config['method'] is not None:
-            logger.log('>> Selecting method: ' + config['method'])
-            data_full = [item for item in data_full if item["method"] == config['method']]
         if config['scenario_id'] is not None:
             logger.log('>> Selecting scenario_id: ' + str(config['scenario_id']))
             data_full = [item for item in data_full if item["scenario_id"] == config['scenario_id']]
@@ -77,7 +74,7 @@ def scenario_parse(config, logger):
         parsed_config.auto_ego = config['auto_ego']
         parsed_config.num_scenario = config['num_scenario']
         parsed_config.data_id = item['data_id']
-        parsed_config.scenario_generation_method = item['method']
+        parsed_config.scenario_folder = item["scenario_folder"]
         parsed_config.scenario_id = item['scenario_id']
         parsed_config.route_id = item['route_id']
         parsed_config.risk_level = item['risk_level']
@@ -93,6 +90,7 @@ def scenario_parse(config, logger):
             config_by_map[parsed_config.town].append(parsed_config)
 
     return config_by_map
+
 
 def scenic_parse(config, logger):
     """
@@ -128,7 +126,6 @@ def scenic_parse(config, logger):
         parsed_config.data_id = i
         parsed_config.scenic_file = scenic_file
         parsed_config.behavior = behaviors[i]
-        parsed_config.scenario_generation_method = config['method']
         parsed_config.scenario_id = config['scenario_id']
         parsed_config.sample_num = config['sample_num']
         parsed_config.trajectory = []

@@ -1,6 +1,6 @@
 ''' 
 Date: 2023-01-31 22:23:17
-LastEditTime: 2023-03-04 17:05:20
+LastEditTime: 2023-04-01 16:02:49
 Description: 
     Copyright (c) 2022-2023 Safebench Team
 
@@ -18,7 +18,7 @@ import joblib
 import numpy as np
 import yaml
 
-from safebench.util.run_util import VideoRecorder
+from safebench.util.run_util import VideoRecorder, VideoRecorder_Perception
 
 
 # Where experiment outputs are saved by default:
@@ -29,7 +29,7 @@ DEFAULT_DATA_DIR = osp.abspath(osp.dirname(osp.dirname(osp.dirname(__file__))))
 FORCE_DATESTAMP = False
 
 
-def setup_logger_kwargs(exp_name, output_dir, seed, datestamp=False, agent=None, scenario=None):
+def setup_logger_kwargs(exp_name, output_dir, seed, datestamp=False, agent=None, scenario=None, scenario_category='planning'):
     # Datestamp forcing
     datestamp = datestamp or FORCE_DATESTAMP
 
@@ -56,6 +56,7 @@ def setup_logger_kwargs(exp_name, output_dir, seed, datestamp=False, agent=None,
     logger_kwargs = dict(
         output_dir=osp.join(data_dir, relpath),
         exp_name=exp_name, 
+        scenario_category=scenario_category,
     )
     return logger_kwargs
 
@@ -137,7 +138,7 @@ class Logger:
         A general-purpose logger.
         Makes it easy to save diagnostics, hyperparameter configurations, the state of a training run, and the trained model.
     """
-    def __init__(self, output_dir=None, output_fname='progress.txt', exp_name=None):
+    def __init__(self, output_dir=None, output_fname='progress.txt', exp_name=None, scenario_category='planning'):
         """
             Initialize a Logger.
 
@@ -159,7 +160,8 @@ class Logger:
         self.exp_name = exp_name
         self.log_print_history = []
         self.video_recorder = None
-
+        self.scenario_category = scenario_category
+        
         self.output_dir = output_dir or "/tmp/experiments/%i" % int(time.time())
         self.log('>> ' + '-' * 40)
         if osp.exists(self.output_dir):
@@ -169,8 +171,30 @@ class Logger:
         self.output_file = open(osp.join(self.output_dir, output_fname), 'a')
         atexit.register(self.output_file.close)
         self.log(">> Logging data to %s" % self.output_file.name, 'green')
+        
         self.eval_results = {}
         self.eval_records = {}
+        self.training_results = {}
+
+    def create_training_dir(self):
+        result_dir = os.path.join(self.output_dir, 'training_results')
+        os.makedirs(result_dir, exist_ok=True)
+        self.result_file = os.path.join(result_dir, 'results.pkl')
+
+    def add_training_results(self, name=None, value=None):
+        if name is not None:
+            if name not in self.training_results:
+                self.training_results[name] = []
+            self.training_results[name].append(value)
+
+    def save_training_results(self):
+        self.log(f'>> Saving training results to {self.result_file}')
+        joblib.dump(self.training_results, self.result_file)
+
+    def print_training_results(self):
+        self.log("Training results:")
+        for key, value in self.eval_results.items():
+            self.log(f"\t {key: <25}{value}")
 
     def create_eval_dir(self, load_existing_results=True):
         result_dir = os.path.join(self.output_dir, 'eval_results')
@@ -182,7 +206,7 @@ class Logger:
                 self.log(f'>> Loading existing evaluation records from {self.record_file}, ')
                 self.eval_records = joblib.load(self.record_file)
             else:
-                self.log(f'>> Loading existing fail because no records.pkl is found.')
+                self.log(f'>> Loading existing record fail because no records.pkl is found.')
                 self.eval_records = {}
 
     def add_eval_results(self, scores=None, records=None):
@@ -294,9 +318,12 @@ class Logger:
         self.log_current_row.clear()
         self.first_row = False
         return data_dict
-
+    
     def init_video_recorder(self):
-        self.video_recorder = VideoRecorder(self.output_dir, logger=self)
+        if self.scenario_category == 'planning':
+            self.video_recorder = VideoRecorder(self.output_dir, logger=self)
+        elif self.scenario_category == 'perception':
+            self.video_recorder = VideoRecorder_Perception(self.output_dir, logger=self)
 
     def add_frame(self, frame):
         self.video_recorder.add_frame(frame)

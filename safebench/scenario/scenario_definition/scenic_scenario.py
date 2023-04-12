@@ -1,3 +1,4 @@
+import numpy as np
 from safebench.scenario.scenario_manager.timer import GameTime
 from safebench.scenario.scenario_definition.atomic_criteria import Status
 from safebench.scenario.scenario_manager.carla_data_provider import CarlaDataProvider
@@ -46,30 +47,31 @@ class ScenicScenario():
         CarlaDataProvider._carla_actor_pool[actor.id] = actor
         CarlaDataProvider.register_actor(actor)       
         
-        ## coarse traj ##
-        init_waypoints = []
-        routeplanner = RoutePlanner(ego_vehicle, 200, init_waypoints, ego_route=self.config.ego_route)
-        
-        _waypoint_buffer = []
-        while len(_waypoint_buffer) < 100:
-            pop = routeplanner._waypoints_queue.popleft()
-            _waypoint_buffer.append(pop[0].transform.location)
-            
-        ### 150 meter dense route planning ###
-        route = interpolate_trajectory(self.world, _waypoint_buffer)
-        index = 1
-        prev_wp = route[0][0].location
-        _accum_meters = 0
-        
-        while _accum_meters < 150:
-            pop = route[index]
-            wp = pop[0].location
-            d = wp.distance(prev_wp)
-            _accum_meters += d
-            prev_wp = wp
-            index += 1
-        route = route[:index]
-        
+        if len(self.config.trajectory) == 0:
+            # coarse traj ##
+            routeplanner = RoutePlanner(ego_vehicle, 200, [])
+
+            _waypoint_buffer = []
+            while len(_waypoint_buffer) < 50:
+                pop = routeplanner._waypoints_queue.popleft()
+                _waypoint_buffer.append(pop[0].transform.location)
+
+            ### dense route planning ###
+            route = interpolate_trajectory(self.world, _waypoint_buffer)
+            index = 1
+            prev_wp = route[0][0].location
+            _accum_meters = 0
+            while _accum_meters < 100:
+                pop = route[index]
+                wp = pop[0].location
+                d = wp.distance(prev_wp)
+                _accum_meters += d
+                prev_wp = wp
+                index += 1
+            route = route[:index]
+        else:
+            route = interpolate_trajectory(self.world, self.config.trajectory)
+
         CarlaDataProvider.set_ego_vehicle_route(convert_transform_to_location(route))
         CarlaDataProvider.set_scenario_config(self.config)
         
@@ -170,6 +172,31 @@ class ScenicScenario():
             criteria['distance_to_route'] = InRouteTest(self.ego_vehicle, route=route, offroad_max=30)
             criteria['route_complete'] = RouteCompletionTest(self.ego_vehicle, route=route)
         return criteria
+
+    @staticmethod
+    def _get_actor_state(actor):
+        actor_trans = actor.get_transform()
+        actor_x = actor_trans.location.x
+        actor_y = actor_trans.location.y
+        actor_yaw = actor_trans.rotation.yaw / 180 * np.pi
+        yaw = np.array([np.cos(actor_yaw), np.sin(actor_yaw)])
+        velocity = actor.get_velocity()
+        acc = actor.get_acceleration()
+        return [actor_x, actor_y, actor_yaw, yaw[0], yaw[1], velocity.x, velocity.y, acc.x, acc.y]
+
+    def update_info(self):
+        ego_state = self._get_actor_state(self.ego_vehicle)
+        actor_info = [ego_state]
+        for s_i in self.list_scenarios:
+            for a_i in s_i.other_actors:
+                actor_state = self._get_actor_state(a_i)
+                actor_info.append(actor_state)
+
+        actor_info = np.array(actor_info)
+        # get the info of the ego vehicle and the other actors
+        return {
+            'actor_info': actor_info
+        }
 
     def clean_up(self):
         # stop criterion and destroy sensors

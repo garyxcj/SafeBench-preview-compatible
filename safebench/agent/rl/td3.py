@@ -1,20 +1,16 @@
 import os
-
 import copy
-import numpy as np
+
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
 from fnmatch import fnmatch
-from torch.distributions import Normal
 
-from safebench.util.torch_util import CUDA, CPU, kaiming_init
+from safebench.util.torch_util import CUDA, CPU
 from safebench.agent.base_policy import BasePolicy
 
 
 class MLPNetwork(nn.Module):
-
     def __init__(self, input_dim, output_dim, hidden_size=256):
         super(MLPNetwork, self).__init__()
         self.network = nn.Sequential(
@@ -32,7 +28,6 @@ class MLPNetwork(nn.Module):
 
 
 class Policy(nn.Module):
-
     def __init__(self, state_dim, action_dim, hidden_size=256):
         super(Policy, self).__init__()
         self.action_dim = action_dim
@@ -46,7 +41,6 @@ class Policy(nn.Module):
 
 
 class DoubleQFunc(nn.Module):
-
     def __init__(self, state_dim, action_dim, hidden_size=256):
         super(DoubleQFunc, self).__init__()
         self.network1 = MLPNetwork(state_dim + action_dim, 1, hidden_size)
@@ -55,7 +49,6 @@ class DoubleQFunc(nn.Module):
     def forward(self, state, action):
         x = torch.cat((state, action), dim=1)
         return self.network1(x), self.network2(x)
-
 
 
 class TD3(BasePolicy):
@@ -103,7 +96,6 @@ class TD3(BasePolicy):
         self.policy_optimizer = torch.optim.Adam(self.policy.parameters(), lr=self.lr)
 
         self._update_counter = 0
-
         self.mode = 'train'
 
     def set_mode(self, mode):
@@ -131,7 +123,7 @@ class TD3(BasePolicy):
         return CPU(action)
 
     def update_target(self):
-        """moving average update of target networks"""
+        # moving average update of target networks
         with torch.no_grad():
             for target_q_param, q_param in zip(self.target_q_funcs.parameters(), self.q_funcs.parameters()):
                 target_q_param.data.copy_(self.tau * q_param.data + (1.0 - self.tau) * target_q_param.data)
@@ -177,8 +169,13 @@ class TD3(BasePolicy):
             done_batch = CUDA(torch.FloatTensor(1-batch['done'])).unsqueeze(-1) # [B, 1]
 
             # update q-funcs
-            q1_loss_step, q2_loss_step = self.update_q_functions(state_batch, action_batch, reward_batch,
-                                                                 nextstate_batch, done_batch)
+            q1_loss_step, q2_loss_step = self.update_q_functions(
+                state_batch, 
+                action_batch, 
+                reward_batch,
+                nextstate_batch, 
+                done_batch
+            )
             q_loss_step = q1_loss_step + q2_loss_step
             self.q_optimizer.zero_grad()
             q_loss_step.backward()
@@ -238,3 +235,6 @@ class TD3(BasePolicy):
             self.policy.load_state_dict(checkpoint['policy'])
             self.target_policy.load_state_dict(checkpoint['target_policy'])
             self.continue_episode = episode
+        else:
+            self.logger.log(f'>> No {self.name} model found at {filepath}', 'red')
+            exit()

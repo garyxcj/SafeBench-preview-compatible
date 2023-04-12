@@ -1,6 +1,6 @@
 ''' 
 Date: 2023-01-31 22:23:17
-LastEditTime: 2023-03-22 15:25:09
+LastEditTime: 2023-04-03 22:35:17
 Description: 
     Copyright (c) 2022-2023 Safebench Team
 
@@ -61,6 +61,7 @@ class CarlaRunner:
             'obs_type': agent_config['obs_type'],
             'scenario_category': self.scenario_category,
             'ROOT_DIR': scenario_config['ROOT_DIR'],
+            'warm_up_steps': 9,                                        # number of ticks after spawning the vehicles
             'disable_lidar': True,                                     # show bird-eye view lidar or not
             'display_size': 128,                                       # screen size of one bird-eye view window
             'obs_range': 32,                                           # observation range (meter)
@@ -86,9 +87,14 @@ class CarlaRunner:
         agent_config['ego_action_limit'] = scenario_config['ego_action_limit']
 
         # define logger
-        logger_kwargs = setup_logger_kwargs(self.exp_name, self.output_dir, self.seed,
-                                            agent=agent_config['policy_type'],
-                                            scenario=scenario_config['policy_type'])
+        logger_kwargs = setup_logger_kwargs(
+            self.exp_name, 
+            self.output_dir, 
+            self.seed,
+            agent=agent_config['policy_type'],
+            scenario=scenario_config['policy_type'],
+            scenario_category=self.scenario_category
+        )
         self.logger = Logger(**logger_kwargs)
         
         # prepare parameters
@@ -98,12 +104,14 @@ class CarlaRunner:
             self.save_freq = agent_config['save_freq']
             self.train_episode = agent_config['train_episode']
             self.logger.save_config(agent_config)
+            self.logger.create_training_dir()
         elif self.mode == 'train_scenario':
             self.buffer_capacity = scenario_config['buffer_capacity']
             self.eval_in_train_freq = scenario_config['eval_in_train_freq']
             self.save_freq = scenario_config['save_freq']
             self.train_episode = scenario_config['train_episode']
             self.logger.save_config(scenario_config)
+            self.logger.create_training_dir()
         elif self.mode == 'eval':
             self.save_freq = scenario_config['save_freq']
             self.logger.log('>> Evaluation Mode, skip config saving', 'yellow')
@@ -116,7 +124,7 @@ class CarlaRunner:
         self.logger.log('>> Scenario Policy: ' + scenario_config['policy_type'])
 
         if self.scenario_config['auto_ego']:
-            self.logger.log('>> Using auto-polit for ego vehicle, the action of agent policy will be ignored', 'yellow')
+            self.logger.log('>> Using auto-polit for ego vehicle, action of policy will be ignored', 'yellow')
         if scenario_config['policy_type'] == 'ordinary' and self.mode != 'train_agent':
             self.logger.log('>> Ordinary scenario can only be used in agent training', 'red')
             raise Exception()
@@ -175,7 +183,7 @@ class CarlaRunner:
         for e_i in tqdm(range(start_episode, self.train_episode)):
             # sample scenarios
             sampled_scenario_configs, _ = data_loader.sampler()
-            # TODO: to restart the data loader, reset the index counter every time
+            # reset the index counter to create endless loader
             data_loader.reset_idx_counter()
 
             # get static obs and then reset with init action 
@@ -188,6 +196,7 @@ class CarlaRunner:
             self.agent_policy.set_ego_and_route(self.env.get_ego_vehicles(), infos)
 
             # start loop
+            episode_reward = []
             while not self.env.all_scenario_done():
                 # get action from agent policy and scenario policy (assume using one batch)
                 ego_actions = self.agent_policy.get_action(obs, infos, deterministic=False)
@@ -197,6 +206,7 @@ class CarlaRunner:
                 next_obs, rewards, dones, infos = self.env.step(ego_actions=ego_actions, scenario_actions=scenario_actions)
                 replay_buffer.store([ego_actions, scenario_actions, obs, next_obs, rewards, dones], additional_dict=infos)
                 obs = copy.deepcopy(next_obs)
+                episode_reward.append(np.mean(rewards))
 
                 # train off-policy agent or scenario
                 if self.mode == 'train_agent' and self.agent_policy.type == 'offpolicy':
@@ -207,6 +217,9 @@ class CarlaRunner:
             # end up environment
             self.env.clean_up()
             replay_buffer.finish_one_episode()
+            self.logger.add_training_results('episode', e_i)
+            self.logger.add_training_results('episode_reward', np.sum(episode_reward))
+            self.logger.save_training_results()
 
             # train on-policy agent or scenario
             if self.mode == 'train_agent' and self.agent_policy.type == 'onpolicy':
@@ -217,7 +230,7 @@ class CarlaRunner:
             # eval during training
             if (e_i+1) % self.eval_in_train_freq == 0:
                 #self.eval(env, data_loader)
-                self.logger.log('>> ' + '-' * 40)
+                pass
 
             # save checkpoints
             if (e_i+1) % self.save_freq == 0:
@@ -254,7 +267,10 @@ class CarlaRunner:
 
                 # save video
                 if self.save_video:
-                    self.logger.add_frame(pygame.surfarray.array3d(self.display).transpose(1, 0, 2))
+                    if self.scenario_category == 'planning':
+                        self.logger.add_frame(pygame.surfarray.array3d(self.display).transpose(1, 0, 2))
+                    else:
+                        self.logger.add_frame({s_i['scenario_id']: ego_actions[n_i]['annotated_image'] for n_i, s_i in enumerate(infos)})
 
                 # accumulate scores of corresponding scenario
                 reward_idx = 0
@@ -273,9 +289,9 @@ class CarlaRunner:
                 self.logger.save_video(data_ids=data_ids)
 
             # print score for ranking
-            self.logger.log(f'[{num_finished_scenario}/{data_loader.num_total_scenario}] Ranking scores for batch scenario:', color='yellow')
+            self.logger.log(f'[{num_finished_scenario}/{data_loader.num_total_scenario}] Ranking scores for batch scenario:', 'yellow')
             for s_i in score_list.keys():
-                self.logger.log('\t Env id ' + str(s_i) + ': ' + str(np.mean(score_list[s_i])), color='yellow')
+                self.logger.log('\t Env id ' + str(s_i) + ': ' + str(np.mean(score_list[s_i])), 'yellow')
 
             # calculate evaluation results
             score_function = get_route_scores if self.scenario_category == 'planning' else get_perception_scores
@@ -296,7 +312,14 @@ class CarlaRunner:
             self._init_renderer()
 
             # create scenarios within the vectorized wrapper
-            self.env = VectorWrapper(self.env_params, self.scenario_config, self.world, self.birdeye_render, self.display, self.logger)
+            self.env = VectorWrapper(
+                self.env_params, 
+                self.scenario_config, 
+                self.world, 
+                self.birdeye_render, 
+                self.display, 
+                self.logger
+            )
 
             # prepare data loader and buffer
             data_loader = ScenarioDataLoader(config_by_map[m_i], self.num_scenario, m_i, self.world)
@@ -335,6 +358,6 @@ class CarlaRunner:
         return start_episode
 
     def close(self):
-        pygame.quit() # close pygame renderer
+        pygame.quit() 
         if self.env:
             self.env.clean_up()

@@ -7,6 +7,7 @@ emergency brake or an avoidance maneuver.
 
 ## SET MAP AND MODEL (i.e. definitions of all referenceable vehicle types, road library, etc)
 param map = localPath('../maps/Town_Safebench_Light.xodr')  # or other CARLA map that definitely works
+param carla_map = 'Town_Safebench_Light'
 model scenic.simulators.carla.model
 
 ## CONSTANTS
@@ -45,6 +46,3 @@ bicycle = Bicycle at spotBicycle offset by 3.5@0,
     with heading 90 deg relative to spotBicycle.heading,
     with behavior BicycleBehavior(BICYCLE_MIN_SPEED, THRESHOLD),
     with regionContainedIn None
-
-require 10 <= (distance to intersec) <= 15
-require 10 <= (distance from bicycle to intersec) <= 15
