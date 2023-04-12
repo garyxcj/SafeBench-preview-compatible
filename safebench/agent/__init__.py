@@ -30,7 +30,10 @@ AGENT_POLICY_LIST = {
     'sac': SAC,
     'ddpg': DDPG,
     'ppo': PPO,
-    'rl': RLAgent,
+    'safe_sac': RLAgent,
+    'safe_ppo': RLAgent,
+    'safe_td3': RLAgent,
+    'safe_ddpg': RLAgent,
     'td3': TD3,
     'faster_rcnn': FasterRCNNAgent,
 }
