@@ -1,12 +1,12 @@
 <!--
  * @Date: 2023-01-25 19:36:50
- * @LastEditTime: 2023-04-10 11:55:06
+ * @LastEditTime: 2023-04-12 14:02:50
  * @Description: 
 -->
 
 # SafeBench
 
-### :mega: **We are hosting the Secure and Safe Autonomous Driving (SSAD) Workshop and Challenge at CVPR 2023! Please fill this [form](https://forms.gle/LuwDXmFoQEyK2VoK7) to if you are intereted and check our [website](https://trust-ai.github.io/SSAD2023/) for more details. If you have any questions, please join our [discord channel](https://discord.gg/ewDxfbx3) for further discussion!**
+### :mega: **We are hosting the [Secure and Safe Autonomous Driving (SSAD) Workshop and Challenge](https://trust-ai.github.io/SSAD2023/) at CVPR 2023! Please fill this [form](https://forms.gle/LuwDXmFoQEyK2VoK7), join our [discord channel](https://discord.gg/xW8paTzB) for further discussion if you are intereted.**
 
 ---
 
@@ -24,7 +24,11 @@
 
 This is the source code of Safebench platform, which is designed based on Carla to evaluate the security and safety of autonomous driving vehicles. More details about this platform can be found in this [NeurIPS 2022](https://arxiv.org/pdf/2206.09682.pdf) paper.
 
-![pipeline](./docs/source/images/pipeline.png)
+
+| Perception Evaluation | Control Evaluation |
+| :-------------------: | :----------------: | 
+| ![pipeline](https://github.com/safebench/safebench.github.io/blob/master/videos/perception.gif) | ![pipeline](https://github.com/safebench/safebench.github.io/blob/master/videos/control.gif) | 
+
 
 ## Installation
 
@@ -67,7 +71,7 @@ export PYTHONPATH=$PYTHONPATH:${CARLA_ROOT}/PythonAPI
 ```
 </details>
 
-### 2. Docker Installation
+### 2. Docker Installation (Beta)
 
 <details>
     <summary> Click to expand </summary>
@@ -204,7 +208,7 @@ DISPLAY=:8 python scripts/run.py --agent_cfg sac.yaml --scenario_cfg scenic.yaml
 | `agent_cfg`      | str  |  path to the configuration file of agent. |
 | `scenario_cfg`   | str  |  path to the configuration file of scenario. |
 | `max_episode_step`      | int     | Number of episode used for training agents and scenario. |
-| `num_scenarios` | `{1, 2, 3, 4}` | We support running multiple scenarios in parallel. Current map allows at most 4 scenarios. |
+| `num_scenario`  | `{1, 2, 3, 4}` | We support running multiple scenarios in parallel. Current map allows at most 4 scenarios. |
 | `save_video`    | store_true     |  We support saving videos during the evaluation mode. | 
 | `auto_ego`      | store_true     |  Overwrite the action of ego agent with auto-polit |
 | `port`      | int     |  Port used by Carla, default 2000 |
