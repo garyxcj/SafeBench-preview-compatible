@@ -233,6 +233,16 @@ class RouteScenario():
             'ego_roll': CarlaDataProvider.get_transform(self.ego_vehicle).rotation.roll,
             'ego_pitch': CarlaDataProvider.get_transform(self.ego_vehicle).rotation.pitch,
             'ego_yaw': CarlaDataProvider.get_transform(self.ego_vehicle).rotation.yaw,
+            # 'adv_velocity': CarlaDataProvider.get_velocity(self.list_scenarios[0].other_actors[0]),
+            # 'adv_acceleration_x': self.list_scenarios[0].other_actors[0].get_acceleration().x,
+            # 'adv_acceleration_y': self.list_scenarios[0].other_actors[0].get_acceleration().y,
+            # 'adv_acceleration_z': self.list_scenarios[0].other_actors[0].get_acceleration().z,
+            # 'adv_x': CarlaDataProvider.get_transform(self.list_scenarios[0].other_actors[0]).location.x,
+            # 'adv_y': CarlaDataProvider.get_transform(self.list_scenarios[0].other_actors[0]).location.y,
+            # 'adv_z': CarlaDataProvider.get_transform(self.list_scenarios[0].other_actors[0]).location.z,
+            # 'adv_roll': CarlaDataProvider.get_transform(self.list_scenarios[0].other_actors[0]).rotation.roll,
+            # 'adv_pitch': CarlaDataProvider.get_transform(self.list_scenarios[0].other_actors[0]).rotation.pitch,
+            # 'adv_yaw': CarlaDataProvider.get_transform(self.list_scenarios[0].other_actors[0]).rotation.yaw,
             'current_game_time': GameTime.get_time()
         }
 
