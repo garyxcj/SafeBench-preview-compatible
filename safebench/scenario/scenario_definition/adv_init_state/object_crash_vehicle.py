@@ -148,28 +148,33 @@ class DynamicObjectCrossing(BasicScenario):
                     self.transform.location,
                     carla.Rotation(self.transform.rotation.pitch, yaw, self.transform.rotation.roll)
                 )
+
+                # Now that we found a possible position we just put the vehicle to the underground
+                disp_transform = carla.Transform(
+                    carla.Location(self.transform.location.x, self.transform.location.y, self.transform.location.z),
+                    self.transform.rotation
+                )
+                prop_disp_transform = carla.Transform(
+                    carla.Location(self.transform2.location.x, self.transform2.location.y, self.transform2.location.z),
+                    self.transform2.rotation
+                )
+
+                self.actor_type_list = ['walker.*', 'static.prop.vendingmachine']
+                self.actor_transform_list = [disp_transform, prop_disp_transform]
+                self.other_actors = self.scenario_operation.initialize_vehicle_actors(self.actor_transform_list,
+                                                                                      self.actor_type_list)
+                self.reference_actor = self.other_actors[0]  # used for triggering this scenario
+
                 break
             except RuntimeError as r:
                 print("Base transform is blocking objects ", self.transform)
-                _start_distance += 0.4
+                # _start_distance += 0.4
+                y = 0
                 self._spawn_attempted += 1
                 if self._spawn_attempted >= self._number_of_attempts:
                     raise r
 
-        # Now that we found a possible position we just put the vehicle to the underground
-        disp_transform = carla.Transform(
-            carla.Location(self.transform.location.x, self.transform.location.y, self.transform.location.z),
-            self.transform.rotation
-        )
-        prop_disp_transform = carla.Transform(
-            carla.Location(self.transform2.location.x, self.transform2.location.y, self.transform2.location.z),
-            self.transform2.rotation
-        )
 
-        self.actor_type_list = ['walker.*', 'static.prop.vendingmachine']
-        self.actor_transform_list = [disp_transform, prop_disp_transform]
-        self.other_actors = self.scenario_operation.initialize_vehicle_actors(self.actor_transform_list, self.actor_type_list)
-        self.reference_actor = self.other_actors[0] # used for triggering this scenario
         
     def create_behavior(self, scenario_init_action):
         self.actions = self.convert_actions(scenario_init_action)
