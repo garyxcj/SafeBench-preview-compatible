@@ -35,5 +35,6 @@ AGENT_POLICY_LIST = {
     'safe_td3': RLAgent,
     'safe_ddpg': RLAgent,
     'td3': TD3,
+    'rl': RLAgent,
     'faster_rcnn': FasterRCNNAgent,
 }
