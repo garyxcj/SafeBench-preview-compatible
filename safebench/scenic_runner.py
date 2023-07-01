@@ -384,7 +384,8 @@ class ScenicRunner:
         # get scenario data of different maps
         config_list = scenic_parse(self.scenario_config, self.logger)
         for config in config_list:
-
+            
+            ### debugging ###
             if config.route_id is None:
                 log_name = f'OPT_{config.behavior}'
             else:
@@ -398,7 +399,8 @@ class ScenicRunner:
                 if self.logger.check_eval_dir(log_name) == config.sample_num:
                     self.logger.log(f">> This scenario and route have been done.")
                     continue
-                    
+            ### debugging ###
+            
             # initialize scenic
             self._init_scenic(config)
             # initialize map and render

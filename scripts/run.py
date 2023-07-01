@@ -7,7 +7,7 @@ Description:
     This work is licensed under the terms of the MIT license.
     For a copy, see <https://opensource.org/licenses/MIT>
 '''
-
+import setGPU
 import traceback
 import os.path as osp
 
@@ -41,11 +41,14 @@ if __name__ == '__main__':
     parser.add_argument('--save_video', action='store_true')
     parser.add_argument('--render', type=bool, default=True)
     parser.add_argument('--frame_skip', '-fs', type=int, default=1, help='skip of frame in each step')
-    parser.add_argument('--port', type=int, default=2000, help='port to communicate with carla')
-    parser.add_argument('--tm_port', type=int, default=8000, help='traffic manager port')
+    parser.add_argument('--port', type=int, default=2002, help='port to communicate with carla')
+    parser.add_argument('--tm_port', type=int, default=8002, help='traffic manager port')
     parser.add_argument('--fixed_delta_seconds', type=float, default=0.1)
+    parser.add_argument('--policy1', type=str, default='sac')
+    parser.add_argument('--load1', type=str, default='sac')
+    parser.add_argument('--route1', type=int, default=0)
+    parser.add_argument('--scenario1', type=int, default=0)
     args = parser.parse_args()
-    args_dict = vars(args)
 
     err_list = []
     for agent_cfg in args.agent_cfg:
@@ -58,13 +61,22 @@ if __name__ == '__main__':
             # load agent config
             agent_config_path = osp.join(args.ROOT_DIR, 'safebench/agent/config', agent_cfg)
             agent_config = load_config(agent_config_path)
-
+            agent_config['policy_name'] = args.policy1
+#             agent_config['load_dir'] = osp.join('safebench/agent/model_ckpt/safe_rl/', args.load1)
+            agent_config['load_dir'] = f"safebench/agent/model_ckpt/safe_rl/adv_train/{args.load1}/s0"
+  
             # load scenario config
             scenario_config_path = osp.join(args.ROOT_DIR, 'safebench/scenario/config', scenario_cfg)
             scenario_config = load_config(scenario_config_path)
-
+            scenario_config['route_id'] = [args.route1]
+            scenario_config['scenic_dir'] = f'safebench/scenario/scenario_data/scenic_data/scenario_{args.scenario1}'
+            scenario_config['scenario_id'] = args.scenario1
+            args.output_dir = 'log/' + args.mode +'/' + agent_config['policy_name']+ '/' + f'{args.load1}'
+            args.exp_name = 'scenario_' + str(scenario_config['scenario_id'])
+            args_dict = vars(args)
             # main entry with a selected mode
             agent_config.update(args_dict)
+            print(agent_config['load_dir'])
             scenario_config.update(args_dict)
             if scenario_config['policy_type'] == 'scenic':
                 from safebench.scenic_runner import ScenicRunner
