@@ -1,0 +1,20 @@
+""" The ego vehicle is driving on a straight road and encounters a barrier that has been placed in the middle of the road, forcing the ego to navigate around it.
+"""
+
+param map = localPath('../maps/Town05.xodr') 
+param carla_map = 'Town05'
+model scenic.simulators.carla.model
+
+## CONSTANTS
+EGO_MODEL = "vehicle.tesla.model3"
+
+lane = Uniform(*network.lanes)
+
+spawn = OrientedPoint on lane.centerline
+ego = Car at spawn,
+    with blueprint EGO_MODEL
+
+AdvAgent = Barrier following roadDirection for Range(15, 30),
+    facing Range(-180, 180) deg relative to roadDirection
+
+require (distance to intersection) > 50

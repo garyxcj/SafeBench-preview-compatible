@@ -1,0 +1,40 @@
+'''The ego is performing a right turn at an intersection when the crossing car changes lanes without signaling, forcing the ego to quickly react and adjust its path.
+'''
+
+param map = localPath('../maps/Town05.xodr') 
+param carla_map = 'Town05'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+behavior AdversaryBehavior(SPEED, TRAJECTORY, DISTANCE):
+    laneChangeCompleted = False
+    try:
+        do FollowTrajectoryBehavior(SPEED, trajectory=TRAJECTORY) 
+    interrupt when (distance from self to ego) < DISTANCE and len(network.laneSectionAt(self).adjacentLanes) != 0 and not laneChangeCompleted:
+        LaneSec = network.laneSectionAt(self).adjacentLanes[0]
+        do LaneChangeBehavior(
+            laneSectionToSwitch=LaneSec,
+            target_speed=SPEED)
+        laneChangeCompleted = True
+        
+intersection = Uniform(*filter(lambda i: i.is4Way and i.isSignalized, network.intersections))
+egoInitLane = Uniform(*intersection.incomingLanes)
+egoManeuver = Uniform(*filter(lambda m: m.type is ManeuverType.RIGHT_TURN, egoInitLane.maneuvers))
+egoTrajectory = [egoInitLane, egoManeuver.connectingLane, egoManeuver.endLane]
+
+advManeuvers = filter(lambda i: i.type == ManeuverType.STRAIGHT, egoManeuver.conflictingManeuvers)
+advManeuver = Uniform(*advManeuvers)
+advTrajectory = [advManeuver.startLane, advManeuver.connectingLane, advManeuver.endLane]
+
+egoSpawnPt = OrientedPoint in egoManeuver.startLane.centerline
+advSpawnPt = advManeuver.connectingLane.centerline[0]
+
+ego = Car at egoSpawnPt,
+    with blueprint EGO_MODEL
+
+adversary = Car following roadDirection from advSpawnPt for Range(12, 17),
+    with  behavior AdversaryBehavior(Range(7, 10), advTrajectory, Range(10, 15))
+    
+require 20 <= (distance to intersection) <= 30
+require -110 deg <= RelativeHeading(adversary) <= -70 deg
+require adversary in advManeuver.startLane or adversary in advManeuver.connectingLane

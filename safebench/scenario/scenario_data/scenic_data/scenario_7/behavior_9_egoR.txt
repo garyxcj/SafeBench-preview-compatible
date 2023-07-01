@@ -1,0 +1,25 @@
+'''The ego is performing a right turn at an intersection when a cyclist approaches from the right side, forcing the ego to quickly react and adjust the turn to avoid a collision with the cyclist.
+'''
+
+param map = localPath('../maps/Town01.xodr') 
+param carla_map = 'Town01'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+intersection = Uniform(*filter(lambda i: i.is4Way or i.is3Way, network.intersections))
+egoManeuver = Uniform(*filter(lambda m: m.type is ManeuverType.RIGHT_TURN, intersection.maneuvers))
+egoInitLane = egoManeuver.startLane
+egoTrajectory = [egoInitLane, egoManeuver.connectingLane, egoManeuver.endLane]
+egoSpawnPt = OrientedPoint in egoInitLane.centerline
+
+tempSpawnPt = egoManeuver.egoInitLane.centerline[-1]
+
+ego = Car at egoSpawnPt,
+    with blueprint EGO_MODEL
+
+AdvAgent = Bicycle beyond tempSpawnPt by Range(2, 6) @ Range(-2, 2),
+    with heading 90 deg relative to roadDirection,
+    with behavior CrossingBehavior(ego, Range(4, 8), Range(10, 15)),
+    with regionContainedIn None
+        
+require 10 <= (distance to intersection) <= 30

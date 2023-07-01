@@ -3,7 +3,6 @@ Based on 2019 Carla Challenge Traffic Scenario 05.
 Ego-vehicle performs a lane changing to evade a leading vehicle, which is moving too slowly.
 """
 param map = localPath('../maps/Town_Safebench_Light.xodr')  # or other CARLA map that definitely works
-param carla_map = 'Town_Safebench_Light'
 model scenic.domains.driving.model
 
 #CONSTANTS
@@ -49,3 +48,5 @@ ego = Car at spawnPt,
 cyclist = Car following roadDirection from ego for EGO_TO_BICYCLE,
 	with behavior SlowCarBehavior()
 
+require (distance from ego to intersection) > 10
+require (distance from cyclist to intersection) > 10

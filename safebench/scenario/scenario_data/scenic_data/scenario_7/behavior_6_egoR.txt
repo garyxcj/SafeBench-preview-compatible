@@ -1,0 +1,35 @@
+'''The ego is performing a right turn at an intersection when a driver in the adjacent lane suddenly signals and starts to change lanes into the turning lane, requiring the ego to quickly react and adjust the maneuver to avoid a collision.
+'''
+
+param map = localPath('../maps/Town01.xodr') 
+param carla_map = 'Town01'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+behavior AdvBehavior(SPEED, DISTANCE):
+    laneChangeCompleted = False
+    try:
+        do FollowLaneBehavior(target_speed=SPEED)
+    interrupt when (distance from self to ego) < DISTANCE and not laneChangeCompleted:
+        current_laneSection = network.laneSectionAt(self)
+        RightLaneSec = current_laneSection._laneToRight
+        do LaneChangeBehavior(
+            laneSectionToSwitch=RightLaneSec,
+            target_speed=SPEED)
+        laneChangeCompleted = True
+        
+intersection = Uniform(*filter(lambda i: i.is4Way or i.is3Way, network.intersections))
+egoInitLane = Uniform(*intersection.incomingLanes)
+egoManeuver = Uniform(*filter(lambda m: m.type is ManeuverType.RIGHT_TURN, egoInitLane.maneuvers))
+egoTrajectory = [egoInitLane, egoManeuver.connectingLane, egoManeuver.endLane]
+
+egoSpawnPt = OrientedPoint in egoManeuver.startLane.centerline
+spawn2 = OrientedPoint left of egoSpawnPt by 4
+
+ego = Car at egoSpawnPt,
+    with blueprint EGO_MODEL
+
+AdvAgent = Car following roadDirection from spawn2 for Range(25, 40),
+    with behavior AdvBehavior(Range(6, 10), Range(10, 15))
+    
+require 50 <= (distance to intersection) <= 70

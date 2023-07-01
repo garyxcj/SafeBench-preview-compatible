@@ -1,0 +1,29 @@
+'''The ego encounters a parked car blocking its lane and must use the opposite lane to bypass the vehicle, carefully assessing the situation and yielding to oncoming traffic, when an oncoming cyclist swerves into the lane unexpectedly, necessitating the ego to brake or maneuver to avoid a potential accident.
+'''
+
+param map = localPath('../maps/Town01.xodr') 
+param carla_map = 'Town01'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+laneSecsWithLeftLane = []
+for lane in network.lanes:
+    for laneSec in lane.sections:
+        if laneSec._laneToLeft is not None and laneSec._laneToRight is None:
+            if laneSec._laneToLeft.isForward is not laneSec.isForward:
+                laneSecsWithLeftLane.append(laneSec)
+
+initLaneSec = Uniform(*laneSecsWithLeftLane)
+spawn = OrientedPoint in initLaneSec.centerline
+
+ego = Car at spawn,
+    with blueprint EGO_MODEL
+    
+AdvAgent1 = Car following roadDirection from spawn for Range(20, 40),
+    with regionContainedIn initLaneSec.lane
+
+AdvAgent2 = Bicycle beyond AdvAgent1 by Range(-6, -2) @ Range(5, 15),
+    with regionContainedIn initLaneSec._laneToLeft.lane,
+    with behavior FollowLaneBehavior(Range(4, 8))
+    
+require (distance to intersection) > 50

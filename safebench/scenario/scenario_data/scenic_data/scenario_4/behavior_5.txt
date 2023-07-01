@@ -1,0 +1,33 @@
+'''The ego encounters a parked car blocking its lane and must use the opposite lane to bypass the vehicle when an oncoming pedestrian, walking a dog on a long leash, enters the lane without warning, necessitating the ego to brake sharply or steer to avoid hitting the pedestrian and the dog.
+'''
+
+param map = localPath('../maps/Town01.xodr') 
+param carla_map = 'Town01'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+behavior AdversaryBehavior(SPEED):
+    take SetWalkingDirectionAction(0 deg relative to roadDirection)
+    take SetWalkingSpeedAction(SPEED)
+        
+laneSecsWithLeftLane = []
+for lane in network.lanes:
+    for laneSec in lane.sections:
+        if laneSec._laneToLeft is not None and laneSec._laneToRight is None:
+            if laneSec._laneToLeft.isForward is not laneSec.isForward:
+                laneSecsWithLeftLane.append(laneSec)
+
+initLaneSec = Uniform(*laneSecsWithLeftLane)
+spawn = OrientedPoint in initLaneSec.centerline
+
+ego = Car at spawn,
+    with blueprint EGO_MODEL
+    
+AdvAgent1 = Car following roadDirection from spawn for Range(20, 40),
+    with regionContainedIn initLaneSec.lane
+
+AdvAgent2 = Pedestrian beyond AdvAgent1 by Range(-2, -6) @ Range(5, 15),
+    with regionContainedIn initLaneSec._laneToLeft.lane,
+    with behavior AdversaryBehavior(Range(1, 5))
+    
+require (distance to intersection) > 50

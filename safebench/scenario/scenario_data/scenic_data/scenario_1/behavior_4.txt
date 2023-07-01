@@ -1,0 +1,28 @@
+""" The ego is driving on a straight road when an adversarial pedestrian, attempting to cause an accident or disrupt traffic, deliberately steps into the road right in front of the ego vehicle, requiring the ego to brake sharply or take evasive action to avoid a collision.
+"""
+
+param map = localPath('../maps/Town05.xodr') 
+param carla_map = 'Town05'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+behavior AdvBehavior(speed, threshold):
+    try:
+        do CrossingBehavior(ego, speed, threshold)
+    interrupt when network.laneAt(self) is network.laneAt(ego):
+        take SetWalkingSpeedAction(0)
+
+lane = Uniform(*network.lanes)
+spawn = OrientedPoint on lane.centerline
+
+ego = Car at spawn,
+    with blueprint EGO_MODEL
+    
+spawn2 = OrientedPoint left of spawn by Range(2, 6)
+
+AdvAgent = Pedestrian following roadDirection from spawn2 for Range(30, 50),
+    with heading -90 deg relative to roadDirection,
+    with behavior AdvBehavior(Range(1, 5), Range(15, 30)),
+    with regionContainedIn lane.road
+    
+require (distance to intersection) > 70

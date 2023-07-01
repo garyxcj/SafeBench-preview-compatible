@@ -1,0 +1,32 @@
+'''The ego is changing lanes when construction barriers suddenly appear in the target lane, forcing the ego to quickly react and either abort the lane change or maneuver around the obstacles.
+'''
+
+param map = localPath('../maps/Town03.xodr') 
+param carla_map = 'Town03'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+laneSecsWithRightLane = []
+for lane in network.lanes:
+    for laneSec in lane.sections:
+        if laneSec._laneToRight is not None:
+            if laneSec._laneToRight.isForward is laneSec.isForward:
+                laneSecsWithRightLane.append(laneSec)
+
+initLaneSec = Uniform(*laneSecsWithRightLane)
+
+spawn = OrientedPoint in initLaneSec.centerline
+
+ego = Car at spawn,
+    with blueprint EGO_MODEL
+    
+spawn2 = OrientedPoint right of spawn by 3.6
+
+leadDistance = Range(25, 45)
+LeadingAgent = Car following roadDirection from spawn for Range(25, 45),
+    with behavior FollowLaneBehavior(Range(2, 5))
+    
+AdvAgent = Barrier following roadDirection from spawn2 for (leadDistance + Range(15, 25)),
+    with heading 90 deg relative to roadDirection
+    
+require (distance to intersection) > 70

@@ -1,0 +1,37 @@
+''' The ego is turning left and a pedestrian is crossing the road, but suddenly stops in the middle of the intersection, causing the ego to have to slow down and maneuver around the pedestrian.
+'''
+
+param map = localPath('../maps/Town05.xodr')
+param carla_map = 'Town05'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+behavior AdvBehavior(SPEED, DISTANCE):
+    try:
+        do CrossingBehavior(ego, SPEED, DISTANCE)
+    interrupt when network.laneAt(ego) is not None and self.position in ego.lane:
+        take SetWalkingSpeedAction(0)
+    interrupt when self.position in egoManeuver.connectingLane: 
+        take SetWalkingSpeedAction(0)
+    interrupt when self.position in egoManeuver.endLane:
+        take SetWalkingSpeedAction(0)
+        
+intersection = Uniform(*filter(lambda i: i.is4Way or i.is3Way, network.intersections))
+egoManeuver = Uniform(*filter(lambda m: m.type is ManeuverType.LEFT_TURN, intersection.maneuvers))
+egoInitLane = egoManeuver.startLane
+egoTrajectory = [egoInitLane, egoManeuver.connectingLane, egoManeuver.endLane]
+egoSpawnPt = OrientedPoint in egoInitLane.centerline
+
+tempManeuver = Uniform(*filter(lambda m: m.type is ManeuverType.RIGHT_TURN, egoManeuver.reverseManeuvers))
+tempInitLane = tempManeuver.startLane
+tempSpawnPt = tempInitLane.centerline[-1]
+
+ego = Car at egoSpawnPt,
+    with blueprint EGO_MODEL
+
+AdvAgent = Pedestrian beyond tempSpawnPt by Range(-2, 2) @ Range(-2, 2),
+    with heading ego.heading,
+    with regionContainedIn None,
+    with behavior AdvBehavior(Range(1, 5), Range(20, 30))
+
+require 10 <= (distance to intersection) <= 30

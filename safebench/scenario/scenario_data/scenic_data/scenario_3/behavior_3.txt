@@ -1,0 +1,38 @@
+''' The ego is changing lanes on a busy road when a vehicle in the target lane unexpectedly brakes, forcing the ego to quickly adjust speed and maintain a safe following distance to avoid a rear-end collision.
+'''
+
+param map = localPath('../maps/Town03.xodr') 
+param carla_map = 'Town03'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+behavior AdvBehavior(SPEED, DISTANCE):
+    try: 
+        do FollowLaneBehavior(SPEED)
+    interrupt when (distance from ego to self) < DISTANCE:
+        take SetBrakeAction(1)
+
+laneSecsWithRightLane = []
+for lane in network.lanes:
+    for laneSec in lane.sections:
+        if laneSec._laneToRight is not None:
+            if laneSec._laneToRight.isForward is laneSec.isForward:
+                laneSecsWithRightLane.append(laneSec)
+
+initLaneSec = Uniform(*laneSecsWithRightLane)
+
+spawn = OrientedPoint in initLaneSec.centerline
+
+ego = Car at spawn,
+    with blueprint EGO_MODEL
+    
+spawn2 = OrientedPoint right of spawn by 4
+
+speed1 = Range(2, 5)
+LeadingAgent = Car following roadDirection from spawn for Range(25, 45),
+    with behavior FollowLaneBehavior(target_speed=speed1)
+    
+AdvAgent = Car following roadDirection from spawn2 for Range(25, 45),
+    with behavior AdvBehavior(Range(speed1, 8), Range(15, 25))
+    
+require (distance to intersection) > 70

@@ -1,0 +1,35 @@
+'''The ego is performing a right turn at an intersection when the crossing car drives too fast or too slow, requiring the ego to adjust its speed and decision-making.
+'''
+
+param map = localPath('../maps/Town05.xodr') 
+param carla_map = 'Town05'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+behavior AdversaryBehavior(SPEED, TRAJECTORY, DISTANCE, RANGE):
+    try:
+        do FollowTrajectoryBehavior(SPEED, trajectory=TRAJECTORY) 
+    interrupt when (distance from self to ego) < DISTANCE:
+        take SetSpeedAction(SPEED + Range(-RANGE, RANGE))
+        
+intersection = Uniform(*filter(lambda i: i.is4Way and i.isSignalized, network.intersections))
+egoInitLane = Uniform(*intersection.incomingLanes)
+egoManeuver = Uniform(*filter(lambda m: m.type is ManeuverType.RIGHT_TURN, egoInitLane.maneuvers))
+egoTrajectory = [egoInitLane, egoManeuver.connectingLane, egoManeuver.endLane]
+
+advManeuvers = filter(lambda i: i.type == ManeuverType.STRAIGHT, egoManeuver.conflictingManeuvers)
+advManeuver = Uniform(*advManeuvers)
+advTrajectory = [advManeuver.startLane, advManeuver.connectingLane, advManeuver.endLane]
+
+egoSpawnPt = OrientedPoint in egoManeuver.startLane.centerline
+advSpawnPt = advManeuver.connectingLane.centerline[0]
+
+ego = Car at egoSpawnPt,
+    with blueprint EGO_MODEL
+
+adversary = Car following roadDirection from advSpawnPt for Range(-5, 5),
+    with  behavior AdversaryBehavior(Range(7, 10), advTrajectory, Range(30, 40),  Range(4, 8))
+    
+require 25 <= (distance to intersection) <= 40
+require -110 deg <= RelativeHeading(adversary) <= -70 deg
+require adversary in advManeuver.startLane or adversary in advManeuver.connectingLane

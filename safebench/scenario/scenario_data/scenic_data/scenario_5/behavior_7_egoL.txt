@@ -1,0 +1,39 @@
+'''The ego is turning left at an intersection on a green light and an adversarial car runs the red light from the opposite direction, causing the ego to have to swerve to avoid a collision.
+'''
+
+param map = localPath('../maps/Town05.xodr') 
+param carla_map = 'Town05'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+## MONITORS
+monitor TrafficLights:
+    freezeTrafficLights()
+    while True:
+        if withinDistanceToTrafficLight(ego, 100):
+            setClosestTrafficLightStatus(ego, "green")
+        if withinDistanceToTrafficLight(adversary, 100):
+            setClosestTrafficLightStatus(adversary, "red")
+        wait
+        
+intersection = Uniform(*filter(lambda i: i.is4Way and i.isSignalized, network.intersections))
+egoInitLane = Uniform(*intersection.incomingLanes)
+egoManeuver = Uniform(*filter(lambda m: m.type is ManeuverType.LEFT_TURN, egoInitLane.maneuvers))
+egoTrajectory = [egoInitLane, egoManeuver.connectingLane, egoManeuver.endLane]
+
+advManeuvers = filter(lambda i: i.type == ManeuverType.STRAIGHT, egoManeuver.conflictingManeuvers)
+advManeuver = Uniform(*advManeuvers)
+advTrajectory = [advManeuver.startLane, advManeuver.connectingLane, advManeuver.endLane]
+
+egoSpawnPt = OrientedPoint in egoManeuver.startLane.centerline
+advSpawnPt = advManeuver.connectingLane.centerline[0]
+
+ego = Car at egoSpawnPt,
+    with blueprint EGO_MODEL
+
+adversary = Car following roadDirection from advSpawnPt for Range(2, 6),
+    with behavior FollowTrajectoryBehavior(Range(7, 10), advTrajectory)
+    
+require 25 <= (distance to intersection) <= 45
+require 170 deg <= abs(RelativeHeading(adversary)) <= 180 deg
+require adversary in advManeuver.startLane or adversary in advManeuver.connectingLane

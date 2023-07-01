@@ -1,0 +1,2 @@
+'''The ego is performing an unprotected left turn at an intersection when a vehicle behind the ego attempts to overtake, necessitating the ego to quickly adjust speed and distance to safely complete the turn without being rear-ended.
+'''

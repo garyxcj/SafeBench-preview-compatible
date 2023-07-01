@@ -1,0 +1,36 @@
+'''The ego approaches an unsignalized intersection and must negotiate with a vehicle approaching from the right that suddenly stops in the intersection, causing confusion about the right of way and requiring the ego to safely establish priority before crossing.
+'''
+
+param map = localPath('../maps/Town05.xodr') 
+param carla_map = 'Town05'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+behavior AdversaryBehavior(SPEED, TRAJECTORY):
+    try:
+        do FollowTrajectoryBehavior(SPEED, trajectory=TRAJECTORY)
+    interrupt when network.laneAt(self) in egoTrajectory:
+        take SetSpeedAction(0)
+        
+intersection = Uniform(*filter(lambda i: i.is4Way and not i.isSignalized, network.intersections))
+egoInitLane = Uniform(*intersection.incomingLanes)
+egoManeuver = Uniform(*filter(lambda m: m.type is ManeuverType.STRAIGHT, egoInitLane.maneuvers))
+egoTrajectory = [egoInitLane, egoManeuver.connectingLane, egoManeuver.endLane]
+egoSpawnPt = OrientedPoint in egoManeuver.startLane.centerline
+
+advManeuvers = filter(lambda i: i.type == ManeuverType.STRAIGHT, egoManeuver.conflictingManeuvers)
+advManeuver = Uniform(*advManeuvers)
+advTrajectory = [advManeuver.startLane, advManeuver.connectingLane, advManeuver.endLane]
+
+egoSpawnPt = OrientedPoint in egoManeuver.startLane.centerline
+advSpawnPt = advManeuver.connectingLane.centerline[0]
+
+ego = Car at egoSpawnPt,
+    with blueprint EGO_MODEL
+
+crossing_car = Car following roadDirection from advSpawnPt for Range(0, 5),
+    with behavior AdversaryBehavior(Range(6, 10), advTrajectory)
+    
+require 25 <= (distance to intersection) <= 45
+require 70 deg <= RelativeHeading(crossing_car) <= 110 deg
+require crossing_car in advManeuver.startLane or crossing_car in advManeuver.connectingLane

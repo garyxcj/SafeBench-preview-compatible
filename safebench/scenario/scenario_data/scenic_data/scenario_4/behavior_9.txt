@@ -1,0 +1,44 @@
+'''The ego is bypassing a vehicle when a nearby driver becomes distracted and starts to drift into the ego's lane, requiring the ego to quickly react and abort the overtaking maneuver to avoid a collision.
+'''
+
+param map = localPath('../maps/Town05.xodr') 
+param carla_map = 'Town05'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+behavior AdvBehavior(SPEED, DISTANCE):
+    laneChangeCompleted = False
+    try:
+        do FollowLaneBehavior(SPEED)
+    interrupt when (distance from self to ego) < DISTANCE and network.laneAt(self) is not network.laneAt(ego) and not laneChangeCompleted:
+        current_laneSection = network.laneSectionAt(self)
+        LeftLaneSec = current_laneSection._laneToLeft
+        do LaneChangeBehavior(
+            laneSectionToSwitch=LeftLaneSec,
+            target_speed=SPEED)
+        laneChangeCompleted = True
+    interrupt when laneChangeCompleted:
+        do FollowLaneBehavior(LeadingAgent.speed)
+    
+laneSecsWithRightLane = []
+for lane in network.lanes:
+    for laneSec in lane.sections:
+        if laneSec._laneToRight is not None:
+            if laneSec._laneToRight._laneToRight is not None:
+                if laneSec._laneToRight._laneToRight.isForward is laneSec.isForward:
+                    laneSecsWithRightLane.append(laneSec)
+
+initLaneSec = Uniform(*laneSecsWithRightLane)
+spawn = OrientedPoint in initLaneSec.centerline
+ego = Car at spawn,
+    with blueprint EGO_MODEL
+spawn2 = OrientedPoint right of spawn by 4
+
+leadDistance = Range(35, 55)
+LeadingAgent = Car following roadDirection from spawn for leadDistance,
+    with behavior FollowLaneBehavior(Range(2, 5))
+    
+AdvAgent = Car following roadDirection from spawn2 for Range(leadDistance-15, leadDistance-8),
+    with behavior AdvBehavior(Range(2, 5), Range(10, 15))
+    
+require (distance to intersection) > 70

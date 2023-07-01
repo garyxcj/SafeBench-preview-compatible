@@ -16,6 +16,8 @@ import os.path as osp
 import math
 import json
 import random
+import pickle
+from copy import deepcopy
 
 import carla
 import xml.etree.ElementTree as ET
@@ -98,25 +100,20 @@ def scenic_parse(config, logger):
     """
     mode = config['mode']
     scenic_dir = config['scenic_dir']
+    
+    route_file_formatter = osp.join(config['route_dir'], 'scenic_route.pickle')
+    with open(route_file_formatter, 'rb') as f:
+        data_full = pickle.load(f)
     scenic_rel_listdir = sorted([path for path in os.listdir(scenic_dir) if path.split('.')[1] == 'scenic'])
     scenic_abs_listdir = [osp.join(scenic_dir, path) for path in scenic_rel_listdir]
     behaviors = [path.split('.')[0] for path in scenic_rel_listdir]
     assert len(scenic_rel_listdir) > 0, 'no scenic file in this dir'
     
     try:
-        scene_map_dir = [path for path in os.listdir(scenic_dir) if path.split('.')[1] == 'json']
-        if len(scene_map_dir) == 0:
-            pass
-        else:
-            scene_map_dir = scene_map_dir[0]
-            f = open(osp.join(scenic_dir, scene_map_dir))
-            scene_index_map = json.load(f)
-            for behavior in behaviors:
-                if len(scene_index_map[behavior]) != config['select_num']:
-                    scene_map_dir = []
-                    break
+        params_dir = open(osp.join(scenic_dir, f"scenario_{config['scenario_id']}.json"))
+        params = json.load(params_dir)
     except:
-        scene_map_dir = []
+        params = {}
 
     config_list = []
     for i, scenic_file in enumerate(scenic_abs_listdir):
@@ -126,15 +123,49 @@ def scenic_parse(config, logger):
         parsed_config.data_id = i
         parsed_config.scenic_file = scenic_file
         parsed_config.behavior = behaviors[i]
+        parsed_config.scenario_generation_method = config['method']
         parsed_config.scenario_id = config['scenario_id']
         parsed_config.sample_num = config['sample_num']
         parsed_config.trajectory = []
         parsed_config.select_num = config['select_num']
-        if mode == 'eval' and len(scene_map_dir):
-            parsed_config.scene_index = scene_index_map[behaviors[i]]
+        parsed_config.mode = config['mode']
+        parsed_config.opt_step =  config['opt_step']
+        
+        parsed_config.extra_params = {}
+        parsed_config.extra_params['port'] = config['port']
+        parsed_config.extra_params['traffic_manager_port'] = config['tm_port']
+        
+        route = config['route_id']
+        if route is None:
+            parsed_config.route_id = None
+            if mode == 'eval':
+                parsed_config.opt_params = params[f'OPT_{behaviors[i]}']
+            else:
+                parsed_config.opt_params = None
+            config_list.append(parsed_config)
         else:
-            parsed_config.scene_index = list(range(config['sample_num']))
-        config_list.append(parsed_config)
+            for j in route:
+                updated_config = deepcopy(parsed_config)
+                updated_config.route_id = j
+                data = data_full[f'scenario_id_{updated_config.scenario_id}_route_id_{j}']
+                updated_config.trajectory = data['trajectory']
+                updated_config.extra_params['town'] = data['town']
+                updated_config.extra_params['weather'] = data['weather']
+                updated_config.extra_params['waypoints'] = data['waypoints']
+                updated_config.extra_params['lanePts'] = data['lanePts']
+                spawnPt = data['spawnPt']
+                updated_config.extra_params['spawnPt'] = (spawnPt['x'], spawnPt['y'])
+                updated_config.extra_params['z'] = spawnPt['z']
+                updated_config.extra_params['yaw'] = spawnPt['yaw']
+        
+                if mode == 'eval':
+                    try:
+                        updated_config.opt_params = params[f'OPT_{behaviors[i]}_ROUTE-{j}']
+                    except:
+                        continue
+                else:
+                    updated_config.opt_params = None
+                config_list.append(updated_config)
     return config_list
 
 def get_valid_spawn_points(world):

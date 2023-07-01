@@ -377,7 +377,8 @@ class CarlaEnv(gym.Env):
             'waypoints': self.waypoints,
             'route_waypoints': self.route_waypoints,
             'vehicle_front': self.vehicle_front,
-            'cost': self._get_cost()
+            'cost': self._get_cost(),
+            'collision': int(len(self.collision_hist) > 0)
         }
 
         # info from scenarios
@@ -594,6 +595,5 @@ class CarlaEnv(gym.Env):
 
     def clean_up(self):
         self._remove_sensor()
-        if self.scenario_category != 'scenic':
-            self._remove_ego()
+        self._remove_ego()
         self.scenario_manager.clean_up()

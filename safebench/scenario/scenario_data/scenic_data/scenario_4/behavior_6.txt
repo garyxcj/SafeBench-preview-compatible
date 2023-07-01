@@ -1,0 +1,23 @@
+'''The ego is bypassing a vehicle when the driver of the overtaken vehicle becomes aggressive and accelerates, attempting to block the maneuver, necessitating the ego to quickly adjust speed and timing to safely complete the bypass.
+'''
+
+param map = localPath('../maps/Town05.xodr') 
+param carla_map = 'Town05'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+behavior AdvBehavior(SPEED, DISTANCE):
+    try: 
+        do FollowLaneBehavior(SPEED)
+    interrupt when (distance from ego to self) < DISTANCE and network.laneAt(self) is not network.laneAt(ego):
+        take SetThrottleAction(1)
+
+lane = Uniform(*network.lanes)
+spawn = OrientedPoint in lane.centerline
+
+ego = Car at spawn,
+    with blueprint EGO_MODEL
+    
+AdvAgent = Car following roadDirection from spawn for Range(25, 45),
+    
+require (distance to intersection) > 70

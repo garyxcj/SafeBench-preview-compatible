@@ -1,0 +1,46 @@
+'''The ego is passing a line of slow-moving vehicles on a highway and a car suddenly merges into the ego's lane, causing the ego to have to swerve to avoid a collision.
+'''
+
+param map = localPath('../maps/Town05.xodr') 
+param carla_map = 'Town05'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+behavior AdvBehavior(SPEED, DISTANCE):
+    laneChangeCompleted = False
+    try:
+        do FollowLaneBehavior(target_speed=SPEED)
+    interrupt when (distance from self to ego) < DISTANCE and network.laneAt(self) is not network.laneAt(ego) and not laneChangeCompleted:
+        current_laneSection = network.laneSectionAt(self)
+        RightLaneSec = current_laneSection._laneToRight
+        do LaneChangeBehavior(
+            laneSectionToSwitch=RightLaneSec,
+            target_speed=SPEED)
+        laneChangeCompleted = True
+        
+laneSecsWithRightLane = []
+for lane in network.lanes:
+    for laneSec in lane.sections:
+        if laneSec._laneToRight is not None:
+            if laneSec._laneToRight.isForward is laneSec.isForward:
+                laneSecsWithRightLane.append(laneSec)
+
+initLaneSec = Uniform(*laneSecsWithRightLane)
+
+spawn = OrientedPoint in initLaneSec.centerline
+
+ego = Car at spawn,
+    with blueprint EGO_MODEL
+    
+leadDistance = Range(25, 45)
+leadSpeed = Range(2, 5)
+LeadingAgent1 = Car following roadDirection from spawn for leadDistance,
+    with behavior FollowLaneBehavior(leadSpeed)
+
+LeadingAgent2 = Car following roadDirection from LeadingAgent1 for 8,
+    with behavior AdvBehavior(leadSpeed, Range(10, 15))
+    
+LeadingAgent3 = Car following roadDirection from LeadingAgent2 for 8,
+    with behavior FollowLaneBehavior(leadSpeed)
+    
+require (distance to intersection) > 70

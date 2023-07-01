@@ -1,0 +1,41 @@
+'''The ego approaches an unsignalized intersection and encounters a vehicle approaching from the right that is being followed closely by another vehicle, forcing the ego to cautiously assess the situation and negotiate a safe passage through the intersection for both vehicles.
+'''
+
+param map = localPath('../maps/Town05.xodr') 
+param carla_map = 'Town05'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+behavior AdversaryBehavior(SPEED, TRAJECTORY, DISTANCE):
+    try:
+        do FollowTrajectoryBehavior(SPEED, trajectory=TRAJECTORY)
+    interrupt when self.lane is network.laneAt(ego):
+        take SetSpeedAction(0)
+        
+intersection = Uniform(*filter(lambda i: i.is4Way and not i.isSignalized, network.intersections))
+egoInitLane = Uniform(*intersection.incomingLanes)
+egoManeuver = Uniform(*filter(lambda m: m.type is ManeuverType.STRAIGHT, egoInitLane.maneuvers))
+egoTrajectory = [egoInitLane, egoManeuver.connectingLane, egoManeuver.endLane]
+egoSpawnPt = OrientedPoint in egoManeuver.startLane.centerline
+
+advManeuvers = filter(lambda i: i.type == ManeuverType.STRAIGHT, egoManeuver.conflictingManeuvers)
+advManeuver = Uniform(*advManeuvers)
+advTrajectory = [advManeuver.startLane, advManeuver.connectingLane, advManeuver.endLane]
+
+egoSpawnPt = OrientedPoint in egoManeuver.startLane.centerline
+advSpawnPt = advManeuver.connectingLane.centerline[0]
+
+ego = Car at egoSpawnPt,
+    with blueprint EGO_MODEL
+
+speed = Range(6, 10)
+crossing_car1 = Car following roadDirection from advSpawnPt for Range(0, 5),
+    with behavior FollowTrajectoryBehavior(speed, advTrajectory)
+    
+crossing_car2 = Car following roadDirection from crossing_car1 for Range(-10, -6),
+    with behavior FollowTrajectoryBehavior(speed, advTrajectory)
+    
+require 25 <= (distance to intersection) <= 45
+require 70 deg <= RelativeHeading(crossing_car1) <= 110 deg
+require crossing_car1 in advManeuver.startLane or crossing_car1 in advManeuver.connectingLane
+require crossing_car2 in advManeuver.startLane or crossing_car2 in advManeuver.connectingLane

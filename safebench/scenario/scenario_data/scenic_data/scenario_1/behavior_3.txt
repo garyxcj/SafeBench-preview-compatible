@@ -1,0 +1,25 @@
+""" The ego vehicle is driving on a straight road and encounters a pedestrian who suddenly starts to cross the road without looking, causing the ego to brake suddenly to avoid a collision.
+"""
+
+param map = localPath('../maps/Town05.xodr') 
+param carla_map = 'Town05'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+behavior AdvBehavior(speed, threshold):
+    do CrossingBehavior(ego, speed, threshold)
+
+lane = Uniform(*network.lanes)
+spawn = OrientedPoint on lane.centerline
+
+ego = Car at spawn,
+    with blueprint EGO_MODEL
+    
+spawn2 = OrientedPoint right of spawn by Range(2, 6)
+
+AdvAgent = Pedestrian following roadDirection from spawn2 for Range(30, 50),
+    with heading 90 deg relative to roadDirection,
+    with behavior AdvBehavior(Range(1, 5), Range(5, 15)),
+    with regionContainedIn lane.road
+    
+require (distance to intersection) > 70

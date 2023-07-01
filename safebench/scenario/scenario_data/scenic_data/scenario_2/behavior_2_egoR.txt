@@ -1,0 +1,25 @@
+'''The ego is turning right and a pedestrian is jaywalking across the road, causing the ego to have to brake suddenly to avoid hitting the pedestrian.'''
+
+param map = localPath('../maps/Town05.xodr')
+param carla_map = 'Town05'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+intersection = Uniform(*filter(lambda i: i.is4Way or i.is3Way, network.intersections))
+
+egoManeuver = Uniform(*filter(lambda m: m.type is ManeuverType.RIGHT_TURN, intersection.maneuvers))
+egoInitLane = egoManeuver.startLane
+egoTrajectory = [egoInitLane, egoManeuver.connectingLane, egoManeuver.endLane]
+egoSpawnPt = OrientedPoint in egoInitLane.centerline
+
+advSpawnPt = egoInitLane.centerline.end
+
+ego = Car at egoSpawnPt,
+    with blueprint EGO_MODEL
+
+AdvAgent = Pedestrian beyond advSpawnPt by Range(1, 5) @ Range(-2, 2),
+    with heading advSpawnPt.heading + 90 deg,
+    with regionContainedIn None,
+    with behavior CrossingBehavior(ego, Range(1, 5), Range(10, 20))
+
+require 15 <= (distance to intersection) <= 40

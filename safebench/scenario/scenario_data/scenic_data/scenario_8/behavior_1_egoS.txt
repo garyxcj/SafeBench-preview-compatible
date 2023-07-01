@@ -1,0 +1,47 @@
+'''The ego approaches an unsignalized intersection and encounters multiple vehicles arriving simultaneously from different directions, requiring the ego to quickly assess the situation and determine the correct order in which to proceed while maintaining safety.
+'''
+
+param map = localPath('../maps/Town05.xodr') 
+param carla_map = 'Town05'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+intersection = Uniform(*filter(lambda i: i.is4Way and not i.isSignalized, network.intersections))
+egoInitLane = Uniform(*intersection.incomingLanes)
+egoManeuver = Uniform(*filter(lambda m: m.type is ManeuverType.STRAIGHT, egoInitLane.maneuvers))
+egoTrajectory = [egoInitLane, egoManeuver.connectingLane, egoManeuver.endLane]
+egoSpawnPt = OrientedPoint in egoManeuver.startLane.centerline
+
+ego = Car at egoSpawnPt,
+    with blueprint EGO_MODEL
+    
+advManeuversL = filter(lambda i: i.type == ManeuverType.STRAIGHT, egoManeuver.conflictingManeuvers)
+advManeuverL = Uniform(*advManeuversL)
+advTrajectoryL = [advManeuverL.startLane, advManeuverL.connectingLane, advManeuverL.endLane]
+advSpawnPtL = advManeuverL.connectingLane.centerline[0]
+AdvAgentL= Car following roadDirection from advSpawnPtL for Range(-5, 5),
+    with behavior FollowTrajectoryBehavior(Range(6, 10), advTrajectoryL)
+
+advManeuversS = filter(lambda i: i.type == ManeuverType.STRAIGHT, egoManeuver.reverseManeuvers)
+advManeuverS = Uniform(*advManeuversS)
+advTrajectoryS = [advManeuverS.startLane, advManeuverS.connectingLane, advManeuverS.endLane]
+advSpawnPtS = advManeuverS.connectingLane.centerline[0]
+AdvAgentS = Car following roadDirection from advSpawnPtS for Range(-5, 5),
+    with behavior FollowTrajectoryBehavior(Range(6, 10), advTrajectoryS)
+
+advManeuversR = filter(lambda i: i.type == ManeuverType.STRAIGHT, egoManeuver.conflictingManeuvers)
+advManeuverR = Uniform(*advManeuversR)
+advTrajectoryR = [advManeuverR.startLane, advManeuverR.connectingLane, advManeuverR.endLane]
+advSpawnPtR = advManeuverR.connectingLane.centerline[0]
+AdvAgentR= Car following roadDirection from advSpawnPtR for Range(-5, 5),
+    with behavior FollowTrajectoryBehavior(Range(6, 10), advTrajectoryR)
+
+require 25 <= (distance to intersection) <= 45
+require -110 deg <= RelativeHeading(AdvAgentL) <= -70 deg
+require AdvAgentL in advManeuverL.startLane or AdvAgentL in advManeuverL.connectingLane
+require 160 deg <= abs(RelativeHeading(AdvAgentS)) <= 180 deg
+require AdvAgentS in advManeuverS.startLane or AdvAgentS in advManeuverS.connectingLane
+require 70 deg <= RelativeHeading(AdvAgentR) <= 110 deg
+require AdvAgentR in advManeuverR.startLane or AdvAgentR in advManeuverR.connectingLane
+
+

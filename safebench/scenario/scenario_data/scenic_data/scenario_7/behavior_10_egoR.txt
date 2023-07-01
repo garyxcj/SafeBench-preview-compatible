@@ -1,0 +1,48 @@
+'''The ego is performing a right turn at an intersection when a group of pedestrians suddenly begins crossing the street against the signal, forcing the ego to quickly react and stop before completing the turn to avoid an accident.
+'''
+
+param map = localPath('../maps/Town01.xodr') 
+param carla_map = 'Town01'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+## MONITORS
+monitor TrafficLights:
+    freezeTrafficLights()
+    while True:
+        if withinDistanceToTrafficLight(ego, 100):
+            setClosestTrafficLightStatus(ego, "green")
+        wait
+
+intersection = Uniform(*filter(lambda i: i.is4Way or i.is3Way, network.intersections))
+egoInitLane = Uniform(*intersection.incomingLanes)
+egoManeuver = Uniform(*filter(lambda m: m.type is ManeuverType.RIGHT_TURN, egoInitLane.maneuvers))
+egoTrajectory = [egoInitLane, egoManeuver.connectingLane, egoManeuver.endLane]
+
+egoSpawnPt = OrientedPoint in egoManeuver.startLane.centerline
+advSpawnPt = egoInitLane.centerline[-1]
+
+ego = Car at egoSpawnPt,
+    with blueprint EGO_MODEL
+
+AdvAgent1 = Pedestrian beyond advSpawnPt by Range(-6, -3) @ Range(-1, 1),
+    with heading -90 deg relative to ego.heading,
+    with regionContainedIn None,
+    with behavior CrossingBehavior(ego, Range(1, 5), Range(5, 20))
+    
+AdvAgent2 = Pedestrian beyond advSpawnPt by Range(-6, -3) @ Range(-1, 1),
+    with heading -90 deg relative to ego.heading,
+    with regionContainedIn None,
+    with behavior CrossingBehavior(ego, Range(1, 5), Range(5, 20))
+    
+AdvAgent3 = Pedestrian beyond advSpawnPt by Range(3, 6) @ Range(-1, 1),
+    with heading 90 deg relative to ego.heading,
+    with regionContainedIn None,
+    with behavior CrossingBehavior(ego, Range(1, 5), Range(5, 20))
+    
+AdvAgent4 = Pedestrian beyond advSpawnPt by Range(3, 6) @ Range(-1, 1),
+    with heading 90 deg relative to ego.heading,
+    with regionContainedIn None,
+    with behavior CrossingBehavior(ego, Range(1, 5), Range(5, 20))
+    
+require 25 <= (distance to intersection) <= 45

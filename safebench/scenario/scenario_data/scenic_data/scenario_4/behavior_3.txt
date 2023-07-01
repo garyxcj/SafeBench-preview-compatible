@@ -1,0 +1,29 @@
+'''The ego approaches a parked car obstructing its lane and must use the opposite lane to go around when an oncoming car suddenly turns into the ego's path without signaling, requiring the ego to react quickly and take evasive action to prevent a collision.
+'''
+
+param map = localPath('../maps/Town01.xodr') 
+param carla_map = 'Town01'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+laneSecsWithLeftLane = []
+for lane in network.lanes:
+    for laneSec in lane.sections:
+        if laneSec._laneToLeft is not None and laneSec._laneToRight is None:
+            if laneSec._laneToLeft.isForward is not laneSec.isForward:
+                laneSecsWithLeftLane.append(laneSec)
+
+initLaneSec = Uniform(*laneSecsWithLeftLane)
+spawn = OrientedPoint in initLaneSec.centerline
+
+ego = Car at spawn,
+    with blueprint EGO_MODEL
+    
+AdvAgent1 = Car following roadDirection from spawn for Range(20, 40),
+    with regionContainedIn initLaneSec.lane
+
+AdvAgent2 = Car beyond AdvAgent1 by Range(-2, -6) @ Range(5, 15),
+    with regionContainedIn initLaneSec._laneToLeft.lane,
+    with behavior FollowLaneBehavior(Range(4, 8))
+    
+require (distance to intersection) > 50

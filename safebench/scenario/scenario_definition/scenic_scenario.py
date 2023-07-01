@@ -36,7 +36,7 @@ class ScenicScenario():
         self.max_running_step = max_running_step
         self.timeout = 60
 
-        self.route, self.ego_vehicle = self._update_route_and_ego(timeout=self.timeout)
+        self.route, self.ego_vehicle = self._update_route_and_ego()
         self.other_actors = []
         self.list_scenarios = [scenario_scenic(world, self.ego_vehicle, self.config, timeout=self.timeout)]
         self.criteria = self._create_criteria()
@@ -46,6 +46,14 @@ class ScenicScenario():
         actor = ego_vehicle
         CarlaDataProvider._carla_actor_pool[actor.id] = actor
         CarlaDataProvider.register_actor(actor)       
+        
+        self.adv_actors = []
+        for other_actor in self.world.scenic.simulation.objects:
+            if 'Adv' in str(other_actor.behavior):
+                adv_actor = other_actor.carlaActor
+                self.adv_actors.append(adv_actor)
+                CarlaDataProvider._carla_actor_pool[actor.id] = adv_actor
+                CarlaDataProvider.register_actor(adv_actor)      
         
         if len(self.config.trajectory) == 0:
             # coarse traj ##
@@ -71,10 +79,10 @@ class ScenicScenario():
             route = route[:index]
         else:
             route = interpolate_trajectory(self.world, self.config.trajectory)
-
+            
         CarlaDataProvider.set_ego_vehicle_route(convert_transform_to_location(route))
         CarlaDataProvider.set_scenario_config(self.config)
-        
+
         # Timeout of scenario in seconds
         self.timeout = self._estimate_route_timeout(route) if timeout is None else timeout
         return route, ego_vehicle
@@ -113,7 +121,22 @@ class ScenicScenario():
             'ego_yaw': CarlaDataProvider.get_transform(self.ego_vehicle).rotation.yaw,
             'current_game_time': GameTime.get_time()
         }
-
+        adv_actor_status = {}
+        for i, adv_actor in enumerate(self.adv_actors):
+            adv_actor_status[f'adv_agent_{i}'] = {
+            'velocity': CarlaDataProvider.get_velocity(adv_actor),
+            'acceleration_x': adv_actor.get_acceleration().x,
+            'acceleration_y': adv_actor.get_acceleration().y,
+            'acceleration_z': adv_actor.get_acceleration().z,
+            'x': CarlaDataProvider.get_transform(adv_actor).location.x,
+            'y': CarlaDataProvider.get_transform(adv_actor).location.y,
+            'z': CarlaDataProvider.get_transform(adv_actor).location.z,
+            'roll': CarlaDataProvider.get_transform(adv_actor).rotation.roll,
+            'pitch': CarlaDataProvider.get_transform(adv_actor).rotation.pitch,
+            'yaw': CarlaDataProvider.get_transform(adv_actor).rotation.yaw,
+        }
+        running_status.update(adv_actor_status)
+            
         for criterion_name, criterion in self.criteria.items():
             running_status[criterion_name] = criterion.update()
 
@@ -202,6 +225,5 @@ class ScenicScenario():
         # stop criterion and destroy sensors
         for _, criterion in self.criteria.items():
             criterion.terminate()
-
         # clean all actors
         self.world.scenic.endSimulation()

@@ -1,0 +1,29 @@
+'''The ego is performing a right turn at an intersection when a vehicle from the opposite direction makes an unexpected left turn, necessitating the ego to quickly react and adjust speed to safely complete the turn and avoid a collision.
+'''
+
+param map = localPath('../maps/Town01.xodr') 
+param carla_map = 'Town01'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+intersection = Uniform(*filter(lambda i: i.is4Way, network.intersections))
+egoInitLane = Uniform(*intersection.incomingLanes)
+egoManeuver = Uniform(*filter(lambda m: m.type is ManeuverType.RIGHT_TURN, egoInitLane.maneuvers))
+egoTrajectory = [egoInitLane, egoManeuver.connectingLane, egoManeuver.endLane]
+
+advManeuvers = filter(lambda i: i.type == ManeuverType.LEFT_TURN, egoManeuver.conflictingManeuvers)
+advManeuver = Uniform(*advManeuvers)
+advTrajectory = [advManeuver.startLane, advManeuver.connectingLane, advManeuver.endLane]
+
+egoSpawnPt = OrientedPoint in egoManeuver.startLane.centerline
+advSpawnPt = advManeuver.connectingLane.centerline[0]
+
+ego = Car at egoSpawnPt,
+    with blueprint EGO_MODEL
+
+crossing_car = Car following roadDirection from advSpawnPt for Range(5, 15),
+    with behavior FollowTrajectoryBehavior(Range(6, 10), advTrajectory)
+    
+require 25 <= (distance to intersection) <= 45
+require 45 deg <= RelativeHeading(crossing_car) <= 135 deg
+require crossing_car in advManeuver.startLane or crossing_car in advManeuver.connectingLane

@@ -8,6 +8,7 @@ import os
 import random
 import numpy as np 
 import torch
+
 import enum
 import sys
 import time
@@ -42,8 +43,8 @@ def get_parser(scenicFile):
                              help='run dynamic simulations from scenes '
                                   'instead of simply showing diagrams of scenes')
     mainOptions.add_argument('-s', '--seed', help='random seed', default=0, type=int)
-    mainOptions.add_argument('-v', '--verbosity', help='verbosity level (default 0)',
-                             type=int, choices=(0, 1, 2, 3), default=0)
+    mainOptions.add_argument('-v', '--verbosity', help='verbosity level (default 1)',
+                             type=int, choices=(0, 1, 2, 3), default=1)
     mainOptions.add_argument('-p', '--param', help='override a global parameter',
                              nargs=2, default=[], action='append', metavar=('PARAM', 'VALUE'))
     mainOptions.add_argument('-m', '--model', help='specify a Scenic world model', default='scenic.simulators.carla.model')
@@ -101,7 +102,7 @@ def get_parser(scenicFile):
     return args
 
 class ScenicSimulator:
-    def __init__(self, scenicFile, config):
+    def __init__(self, scenicFile, params):
         self.args = get_parser(scenicFile)
         delay = self.args.delay
         errors.showInternalBacktrace = self.args.full_backtrace
@@ -111,18 +112,14 @@ class ScenicSimulator:
         if self.args.pdb_on_reject:
             errors.postMortemRejections = True
             errors.showInternalBacktrace = True
-        params = {}
-        params['port'] = config['port']
-        params['traffic_manager_port'] = config['tm_port']
         translator.dumpTranslatedPython = self.args.dump_initial_python
         translator.dumpFinalAST = self.args.dump_ast
         translator.dumpASTPython = self.args.dump_python
         translator.verbosity = self.args.verbosity
         translator.usePruning = not self.args.no_pruning
-        if self.args.seed is not None and self.args.verbosity >= 1:
-            print(f'Using random seed = {self.args.seed}')
-            random.seed(self.args.seed)
-
+#         if self.args.seed is not None and self.args.verbosity >= 1:
+#             print(f'Using random seed = {self.args.seed}')
+#             random.seed(self.args.seed)
         # Load scenario from file
         if self.args.verbosity >= 1:
             print('Beginning scenario construction...')
@@ -133,23 +130,70 @@ class ScenicSimulator:
                                                 model=self.args.model,
                                                 scenario=self.args.scenario)
         )
+        self.opt_params, self.opt_record = self.get_params()
+        
         totalTime = time.time() - startTime
         if self.args.verbosity >= 1:
             print(f'Scenario constructed in {totalTime:.2f} seconds.')
-        if self.args.simulate:
-            self.simulator = errors.callBeginningScenicTrace(self.scenario.getSimulator)
-            self.simulator.render = False
-            
+        self.simulator = errors.callBeginningScenicTrace(self.scenario.getSimulator)
+        self.simulator.render = False
+        
+    def get_params(self):
+        all_params = self.scenario.params
+        opt_record = {}
+        opt_params = {}
+        for param in all_params.keys():
+            if param.startswith('OPT'):
+                opt_record[param] = []
+                opt_params[param] = all_params[param]
+                opt_params[param].min = opt_params[param].low
+                opt_params[param].max = opt_params[param].high
+        return opt_params, opt_record
+    
+    def record_params(self):
+        all_params = self.scene.params
+        for param in self.opt_record.keys():
+            self.opt_record[param].append(all_params[param])
+        print("Recording params...")
+              
+    def update_params(self):
+        print("Updating params...")
+        for param in self.opt_params.keys():
+            if len(self.opt_record[param]) > 1:
+                mean = np.mean(self.opt_record[param])
+                std = np.std(self.opt_record[param])
+                self.opt_params[param].low = round(max(mean - std, self.opt_params[param].min), 2)
+                self.opt_params[param].high = round(min(mean + std, self.opt_params[param].max), 2)
+#                 self.opt_record[param] = []
+        self.scenario.params.update(self.opt_params)
+        print(self.save_params())
+        
+    def load_params(self, params):
+        print("Loading params...")
+        for param in params.keys():
+            self.opt_params[param].low = params[param]['low']
+            self.opt_params[param].high = params[param]['high']
+        self.scenario.params.update(self.opt_params)
+        
+    def save_params(self):
+        print("Saving params...")
+        save_params = {}
+        for param in self.opt_params.keys():
+            cur_param = self.opt_params[param]
+            save_params[param] = {'low': cur_param.low, 'high': cur_param.high}
+        return save_params
+        
     def generateScene(self):
         scene, iterations = errors.callBeginningScenicTrace(
             lambda: self.scenario.generate(verbosity=self.args.verbosity)
         )
         return scene, iterations
-
+    
     def setSimulation(self, scene):
         if self.args.verbosity >= 1:
             print(f'  Beginning simulation of {scene.dynamicScenario}...')
         try:     
+            self.scene = scene
             self.simulation = self.simulator.createSimulation(scene, verbosity=self.args.verbosity)
         except SimulationCreationError as e:
             if self.args.verbosity >= 1:
@@ -274,10 +318,16 @@ class ScenicSimulator:
         for scenario in tuple(veneer.runningScenarios):
             scenario._stop('simulation terminated')
             
+        # If the simulation was terminated by an exception (including rejections),
+        # some scenarios may still be running; we need to clean them up without
+        # checking their requirements, which could raise rejection exceptions.
+        
+        for scenario in tuple(veneer.runningScenarios):
+            scenario._stop('exception', quiet=True)
+            
         if not hasattr(self, "simulation"):
             return 
         
-        # Record finally-recorded values
         dynamicScenario = self.simulation.scene.dynamicScenario
         values = dynamicScenario._evaluateRecordedExprs(RequirementType.recordFinal)
         for name, val in values.items():
@@ -293,11 +343,6 @@ class ScenicSimulator:
         for monitor in self.simulation.scene.monitors:
             if monitor._isRunning:
                 monitor._stop()
-        # If the simulation was terminated by an exception (including rejections),
-        # some scenarios may still be running; we need to clean them up without
-        # checking their requirements, which could raise rejection exceptions.
-        for scenario in tuple(veneer.runningScenarios):
-            scenario._stop('exception', quiet=True)
         veneer.endSimulation(self.simulation)
         
     def destroy(self):

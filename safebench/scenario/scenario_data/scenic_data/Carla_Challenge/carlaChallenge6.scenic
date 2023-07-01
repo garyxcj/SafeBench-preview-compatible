@@ -5,7 +5,6 @@ using the opposite lane, yielding to oncoming traffic.
 """
 
 param map = localPath('../maps/Town_Safebench_Light.xodr')  # or other CARLA map that definitely works
-param carla_map = 'Town_Safebench_Light'
 model scenic.domains.driving.model
 
 

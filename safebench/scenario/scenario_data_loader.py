@@ -9,8 +9,9 @@ Description:
 '''
 
 import numpy as np
+import carla
 from copy import deepcopy
-from safebench.util.torch_util import set_seed
+import random
 from safebench.scenario.tools.route_manipulation import interpolate_trajectory
 
 
@@ -40,7 +41,6 @@ def check_route_overlap(current_routes, route, distance_threshold=10):
                     return overlap
 
     return overlap
-
 
 class ScenarioDataLoader:
     def __init__(self, config_lists, num_scenario, town, world):
@@ -109,34 +109,56 @@ class ScenarioDataLoader:
         assert len(selected_scenario) <= self.num_scenario, f"number of scenarios is larger than {self.num_scenario}"
         return selected_scenario, len(selected_scenario)
 
-
 class ScenicDataLoader:
-    def __init__(self, scenic, config, num_scenario, seed = 0):
+    def __init__(self, scenic, config, num_scenario):
         self.num_scenario = num_scenario
         self.config = config
         self.behavior = config.behavior
-        self.scene_index = config.scene_index
         self.select_num = config.select_num
-        self.num_total_scenario = len(self.scene_index)
-        self.reset_idx_counter()
-        self.seed = seed
-        self.generate_scene(scenic)
-        
-    def generate_scene(self, scenic):
-        set_seed(self.seed)
+        self.sample_num = config.sample_num
+        self.opt_params = config.opt_params
+        self.mode = config.mode
+        self.route_id = config.route_id
+        self.opt_step = config.opt_step
+        self.scenic = scenic
         self.scene = []
-        while len(self.scene) < self.config.sample_num:
-            scene, _ = scenic.generateScene()
-            if scenic.setSimulation(scene):
-                self.scene.append(scene)
-                scenic.endSimulation()
+        
+        if self.mode == 'eval':
+            self.select_id = self.opt_params['select_id']
+            for j in range(self.sample_num//self.opt_step):
+                self.generate_scene(j, self.opt_step, config.opt_params[f'opt_time_{j}'])
+            if len(self.scene) < self.sample_num:
+                self.generate_scene(j+1, self.sample_num - len(self.scene), config.opt_params[f'opt_time_{j+1}'])
+        else:
+            self.train_scene()
+        self.reset_idx_counter()
+        
+    def generate_scene(self, opt_time, sample_num, params = None):
+        if params is not None:
+            self.scenic.load_params(params)
+        random.seed(opt_time)
+        scenes = []
+        while len(scenes) < sample_num:
+            scene, _ = self.scenic.generateScene()
+            if self.scenic.setSimulation(scene):
+                scenes.append(scene)
+                self.scenic.endSimulation()
+        self.scene.extend(scenes)
             
     def reset_idx_counter(self):
-        self.scenario_idx = self.scene_index
+        if self.mode == 'eval':
+            self.num_total_scenario = len(self.select_id)
+            self.scenario_idx = self.select_id
+        else:
+            self.num_total_scenario = self.sample_num
+            self.scenario_idx = list(range(self.num_total_scenario))
 
-    def __len__(self):
-        return len(self.scenario_idx)
-
+    def train_scene(self, opt_time = 0):
+        if (opt_time + 1) * self.opt_step <= self.sample_num:
+            self.generate_scene(opt_time, self.opt_step)
+        else:
+            self.generate_scene(opt_time, self.sample_num - len(self.scene))
+        
     def sampler(self):
         ## no need to be random for scenic loading file ###
         selected_scenario = []
@@ -144,9 +166,11 @@ class ScenicDataLoader:
         new_config = deepcopy(self.config)
         new_config.scene = self.scene[idx]
         new_config.data_id = idx
-        try:
-            new_config.trajectory = self.scenicToCarlaLocation(new_config.scene.params['Trajectory'])
-        except:
+        if len(new_config.trajectory) != 0:
+            new_config.trajectory = self.scenicToCarlaLocation(new_config.trajectory)
+        elif 'egoTrajectoryPts' in new_config.scene.params:
+            new_config.trajectory = self.scenicToCarlaLocation(new_config.scene.params['egoTrajectoryPts'])
+        else:
             new_config.trajectory = []
         selected_scenario.append(new_config)
         assert len(selected_scenario) <= self.num_scenario, f"number of scenarios is larger than {self.num_scenario}"
@@ -155,8 +179,12 @@ class ScenicDataLoader:
     def scenicToCarlaLocation(self, points):
         waypoints = []
         for point in points:
-            location = carla.Location(point[0], -point[1], 0.0)
-            waypoint = CarlaDataProvider.get_map().get_waypoint(location)
-            location.z = waypoint.transform.location.z + 0.5
+            if len(point) == 3:
+                location = carla.Location(point[0], -point[1], point[2])
+            else:
+                location = carla.Location(point[0], -point[1], 0)
             waypoints.append(location)
         return waypoints
+    
+    def __len__(self):
+        return len(self.scenario_idx)

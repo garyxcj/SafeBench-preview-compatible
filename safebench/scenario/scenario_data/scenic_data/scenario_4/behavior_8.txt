@@ -1,0 +1,37 @@
+'''The ego is attempting to bypass a vehicle when the driver of the overtaken vehicle becomes distracted and starts to drift into the overtaking lane, requiring the ego to quickly react and abort the bypass to avoid a collision.
+'''
+
+param map = localPath('../maps/Town05.xodr') 
+param carla_map = 'Town05'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+behavior AdvBehavior(SPEED, DISTANCE):
+    laneChangeCompleted = False
+    try:
+        do FollowLaneBehavior(target_speed=SPEED)
+    interrupt when (distance from self to ego) < DISTANCE and network.laneAt(self) is not network.laneAt(ego) and not laneChangeCompleted:
+        current_laneSection = network.laneSectionAt(self)
+        RightLaneSec = current_laneSection._laneToRight
+        do LaneChangeBehavior(
+            laneSectionToSwitch=RightLaneSec,
+            target_speed=SPEED)
+        laneChangeCompleted = True
+        
+laneSecsWithRightLane = []
+for lane in network.lanes:
+    for laneSec in lane.sections:
+        if laneSec._laneToRight is not None:
+            if laneSec._laneToRight.isForward is laneSec.isForward:
+                laneSecsWithRightLane.append(laneSec)
+
+initLaneSec = Uniform(*laneSecsWithRightLane)
+
+spawn = OrientedPoint in initLaneSec.centerline
+ego = Car at spawn,
+    with blueprint EGO_MODEL
+    
+LeadingAgent = Car following roadDirection from spawn for Range(25, 45),
+    with behavior AdvBehavior(Range(2, 5), Range(10, 15))
+    
+require (distance to intersection) > 70

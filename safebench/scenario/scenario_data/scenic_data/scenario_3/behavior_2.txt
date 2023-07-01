@@ -1,0 +1,35 @@
+''' The ego is changing lanes on a multi-lane road when an emergency vehicle approaches from the rear at high speed, forcing the ego to quickly reassess the situation and adjust its maneuver to allow the emergency vehicle to pass safely.
+'''
+
+param map = localPath('../maps/Town03.xodr') 
+param carla_map = 'Town03'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+behavior AdvBehavior(speed):
+    take SetSpeedAction(speed)
+    do FollowLaneBehavior(speed)
+    
+laneSecsWithRightLane = []
+for lane in network.lanes:
+    for laneSec in lane.sections:
+        if laneSec._laneToRight is not None:
+            if laneSec._laneToRight.isForward is laneSec.isForward:
+                laneSecsWithRightLane.append(laneSec)
+
+initLaneSec = Uniform(*laneSecsWithRightLane)
+
+spawn = OrientedPoint in initLaneSec.centerline
+
+ego = Car at spawn,
+    with blueprint EGO_MODEL
+    
+spawn2 = OrientedPoint right of spawn by 4
+
+LeadingAgent = Car following roadDirection from spawn for Range(40, 50),
+    with behavior FollowLaneBehavior(target_speed=Range(2, 5))
+    
+AdvAgent = Car following roadDirection from spawn2 for Range(-15, -10),
+    with behavior AdvBehavior(Range(20, 25))
+    
+require (distance to intersection) > 70

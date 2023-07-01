@@ -1,0 +1,28 @@
+'''The ego is performing a right turn at an intersection when a pedestrian unexpectedly enters the crosswalk from behind a parked vehicle, requiring the ego to quickly react and stop before completing the turn to avoid an accident.
+'''
+
+param map = localPath('../maps/Town01.xodr') 
+param carla_map = 'Town01'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+intersection = Uniform(*filter(lambda i: i.is4Way or i.is3Way, network.intersections))
+egoInitLane = Uniform(*intersection.incomingLanes)
+egoManeuver = Uniform(*filter(lambda m: m.type is ManeuverType.RIGHT_TURN, egoInitLane.maneuvers))
+egoTrajectory = [egoInitLane, egoManeuver.connectingLane, egoManeuver.endLane]
+
+egoSpawnPt = OrientedPoint in egoManeuver.startLane.centerline
+advSpawnPt = egoManeuver.startLane.centerline[-1]
+
+ego = Car at egoSpawnPt,
+    with blueprint EGO_MODEL
+
+StopCar = Car beyond advSpawnPt by Range(0, 5) @ Range(-8, -4),
+    with regionContainedIn egoManeuver.startLane.road
+    
+AdvAgent = Pedestrian following roadDirection from StopCar for Range(StopCar.length/2, 8),
+    with heading 90 deg relative to roadDirection,
+    with regionContainedIn egoManeuver.startLane.road,
+    with behavior CrossingBehavior(ego, Range(1, 5), Range(5, 20))
+    
+require 25 <= (distance to intersection) <= 45

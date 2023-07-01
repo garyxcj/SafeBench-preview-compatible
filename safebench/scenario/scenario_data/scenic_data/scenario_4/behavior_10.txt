@@ -1,0 +1,36 @@
+'''The ego is passing a row of parked cars on a narrow street and a pedestrian suddenly steps out from between the cars, causing the ego to have to brake suddenly to avoid hitting the pedestrian.
+'''
+
+param map = localPath('../maps/Town05.xodr') 
+param carla_map = 'Town05'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+laneSecsWithRightLane = []
+for lane in network.lanes:
+    for laneSec in lane.sections:
+        if laneSec._laneToRight is not None:
+            if laneSec._laneToRight.isForward is laneSec.isForward:
+                laneSecsWithRightLane.append(laneSec)
+
+initLaneSec = Uniform(*laneSecsWithRightLane)
+
+spawn = OrientedPoint in initLaneSec.centerline
+
+ego = Car at spawn,
+    with blueprint EGO_MODEL
+    
+leadDistance = Range(25, 45)
+leadSpeed = Range(2, 5)
+LeadingAgent1 = Car following roadDirection from spawn for leadDistance
+
+LeadingAgent2 = Car following roadDirection from LeadingAgent1 for 8
+    
+LeadingAgent3 = Car following roadDirection from LeadingAgent2 for 8
+    
+AdvAgent = Pedestrian beyond LeadingAgent2 by Range(-2, 2) @ Range(LeadingAgent2.length/2, 8+LeadingAgent2.length/2-LeadingAgent3.length/2),
+    with heading -90 deg relative to roadDirection,
+    with behavior CrossingBehavior(ego, Range(1, 5), Range(5, 15)),
+    with regionContainedIn initLaneSec.lane
+    
+require (distance to intersection) > 70

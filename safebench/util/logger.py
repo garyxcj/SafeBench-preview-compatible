@@ -216,12 +216,36 @@ class Logger:
             self.eval_records.update(records)
             return self.eval_records
 
-    def save_eval_results(self):
+#     def save_eval_results(self):
+#         self.log(f'>> Saving evaluation results to {self.result_file}')
+#         joblib.dump(self.eval_results, self.result_file)
+#         self.log(f'>> Saving evaluation records to {self.record_file}, length: {len(self.eval_records)}')
+#         joblib.dump(self.eval_records, self.record_file)
+
+    def save_eval_results(self, name):
+        result_dir = os.path.join(self.output_dir, 'eval_results')
+        os.makedirs(result_dir, exist_ok=True)
+        self.result_file = os.path.join(result_dir, name + '_results.pkl')
+        self.record_file = os.path.join(result_dir, name + '_records.pkl')
         self.log(f'>> Saving evaluation results to {self.result_file}')
         joblib.dump(self.eval_results, self.result_file)
-        self.log(f'>> Saving evaluation records to {self.record_file}, length: {len(self.eval_records)}')
+        self.log(f'>> Saving evaluation records to {self.record_file}')
         joblib.dump(self.eval_records, self.record_file)
 
+    def check_eval_dir(self, name):
+        result_dir = os.path.join(self.output_dir, 'eval_results')
+        os.makedirs(result_dir, exist_ok=True)
+        self.result_file = os.path.join(result_dir, name + '_results.pkl')
+        self.record_file = os.path.join(result_dir, name + '_records.pkl')
+        try:
+            return len(joblib.load(self.record_file))
+        except:
+            return 0
+        
+    def clear(self):
+        self.eval_results = {}
+        self.eval_records = {}
+        
     def print_eval_results(self):
         self.log("Evaluation results:")
         for key, value in self.eval_results.items():
@@ -320,7 +344,7 @@ class Logger:
         return data_dict
     
     def init_video_recorder(self):
-        if self.scenario_category == 'planning':
+        if self.scenario_category in ['planning', 'scenic']:
             self.video_recorder = VideoRecorder(self.output_dir, logger=self)
         elif self.scenario_category == 'perception':
             self.video_recorder = VideoRecorder_Perception(self.output_dir, logger=self)

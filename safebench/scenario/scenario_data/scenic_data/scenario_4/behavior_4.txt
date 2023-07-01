@@ -1,0 +1,35 @@
+'''The ego encounters a parked car blocking its lane and must use the opposite lane to bypass the vehicle when an oncoming car suddenly accelerates, closing the gap for the ego to safely return to its lane, necessitating the ego to quickly decide whether to accelerate or brake to avoid a collision.
+'''
+
+param map = localPath('../maps/Town01.xodr') 
+param carla_map = 'Town01'
+model scenic.simulators.carla.model
+EGO_MODEL = "vehicle.tesla.model3"
+
+behavior AdversaryBehavior(SPEED, DISTANCE):
+    try:
+        do FollowLaneBehavior(SPEED)
+    interrupt when (distance from self to ego) < DISTANCE:
+        take SetThrottleAction(1)
+        
+laneSecsWithLeftLane = []
+for lane in network.lanes:
+    for laneSec in lane.sections:
+        if laneSec._laneToLeft is not None and laneSec._laneToRight is None:
+            if laneSec._laneToLeft.isForward is not laneSec.isForward:
+                laneSecsWithLeftLane.append(laneSec)
+
+initLaneSec = Uniform(*laneSecsWithLeftLane)
+spawn = OrientedPoint in initLaneSec.centerline
+
+ego = Car at spawn,
+    with blueprint EGO_MODEL
+    
+AdvAgent1 = Car following roadDirection from spawn for Range(20, 40),
+    with regionContainedIn initLaneSec.lane
+
+AdvAgent2 = Car beyond AdvAgent1 by Range(-2, -6) @ Range(10, 20),
+    with regionContainedIn initLaneSec._laneToLeft.lane,
+    with behavior AdversaryBehavior(Range(4, 8), Range(20, 30))
+    
+require (distance to intersection) > 50
