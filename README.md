@@ -6,6 +6,8 @@
 
 <div align="center">
 
+<img src="https://github.com/trust-ai/SafeBench/blob/main/docs/source/images/logo.png" alt="logo" width="400"/>
+
 <h1>SafeBench: A Benchmark for Evaluating Autonomous Vehicles in Safety-critical Scenarios</h1>
 
 [![](https://img.shields.io/badge/Documentation-online-green)](https://safebench.readthedocs.io)
@@ -14,16 +16,11 @@
 [![](https://img.shields.io/badge/License-MIT-blue)](#License)
 </div>
 
----
-
-### :mega: **We are hosting the [Secure and Safe Autonomous Driving (SSAD) Workshop and Challenge](https://trust-ai.github.io/SSAD2023/) at CVPR 2023! Please fill this [form](https://forms.gle/LuwDXmFoQEyK2VoK7), join our [discord channel](https://discord.gg/xW8paTzB) for further discussion if you are intereted.**
-
----
 
 
 | Perception Evaluation | Control Evaluation |
 | :-------------------: | :----------------: | 
-| ![pipeline](https://github.com/safebench/safebench.github.io/blob/master/videos/perception.gif) | ![pipeline](https://github.com/safebench/safebench.github.io/blob/master/videos/control.gif) | 
+| ![perception](https://github.com/safebench/safebench.github.io/blob/master/videos/perception.gif) | ![control](https://github.com/safebench/safebench.github.io/blob/master/videos/control.gif) | 
 
 
 ## Installation
